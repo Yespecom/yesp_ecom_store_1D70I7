@@ -37,7 +37,7 @@ const heroSlides: HeroSlide[] = [
     description: "Discover unique styles that make you stand out from the crowd.",
     primaryButton: "Explore Collection",
     primaryButtonLink: "/products",
-    backgroundImage: "/images/comic-background.jpg", // Updated image
+    backgroundImage: "/images/slide2.png", // Updated image
     secondaryButton: "Customised T-Shirt",
     secondaryButtonLink: "/contact",
   },
