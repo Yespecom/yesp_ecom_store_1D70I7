@@ -19,7 +19,7 @@ export default function TermsPage() {
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Terms of Service</h1>
           <p className="text-lg text-gray-600 mb-4">Please read these terms carefully before using our services.</p>
-          <Badge className="bg-green-100 text-green-800">Last updated: January 30, 2025</Badge>
+          <Badge className="bg-green-100 text-green-800">Last updated: June 30, 2025</Badge>
         </div>
 
         {/* Important Notice */}
@@ -169,7 +169,7 @@ export default function TermsPage() {
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">Return Policy</h3>
                 <p className="text-gray-600">
-                  We accept returns within 30 days of delivery for most products. Items must be in original condition
+                  We accept returns within 10 days of delivery for most products. Items must be in original condition
                   with tags attached and in original packaging. Some items may not be eligible for return due to hygiene
                   or safety reasons.
                 </p>
@@ -292,8 +292,6 @@ export default function TermsPage() {
               </p>
             </CardContent>
           </Card>
-
-      
         </div>
       </div>
 
