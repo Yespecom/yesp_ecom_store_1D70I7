@@ -282,14 +282,14 @@ export default function ProductDetailPage() {
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Select Variant">
                       {selectedVariant
-                        ? selectedVariant.attributes.map((attr) => attr.value).join(" / ")
+                        ? selectedVariant.options.map((attr) => attr.value).join(" / ")
                         : "Select Variant"}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {product.variants.map((variant) => (
                       <SelectItem key={variant._id} value={variant._id}>
-                        {variant.attributes.map((attr) => attr.value).join(" / ")}
+                        {variant.options.map((attr) => attr.value).join(" / ")}
                       </SelectItem>
                     ))}
                   </SelectContent>
