@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Heart, ShoppingCart, Star, ArrowLeft, Plus, Minus, Truck, Shield, RotateCcw } from "lucide-react"
 import { useCart } from "@/lib/cart-context"
 import { useWishlist } from "@/lib/wishlist-context"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { toast } from "sonner"
-import { apiClient, type Product } from "@/lib/api"
+import { apiClient, type Product, type ProductVariant } from "@/lib/api"
+import { formatCurrency } from "@/lib/utils"
 
 export default function ProductDetailPage() {
   const params = useParams()
@@ -22,12 +24,39 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedImage, setSelectedImage] = useState(0)
+
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
+  const [displayPrice, setDisplayPrice] = useState(0)
+  const [displayOriginalPrice, setDisplayOriginalPrice] = useState<number | undefined>(undefined)
+  const [displayStock, setDisplayStock] = useState(0)
+  const [displayImages, setDisplayImages] = useState<string[]>([])
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+
   const [quantity, setQuantity] = useState(1)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
 
   const { addItem, isInCart, getItemQuantity } = useCart()
   const { toggleItem, isInWishlist } = useWishlist()
+
+  // Function to update displayed product details based on selected variant
+  const updateDisplayBasedOnSelection = (variant: ProductVariant | null) => {
+    if (variant) {
+      setDisplayPrice(variant.price)
+      setDisplayOriginalPrice(variant.originalPrice)
+      setDisplayStock(variant.stock)
+      setDisplayImages(variant.images && variant.images.length > 0 ? variant.images : product?.gallery || [])
+    } else if (product) {
+      // Fallback to base product details if no variant is selected or product has no variants
+      setDisplayPrice(product.price)
+      setDisplayOriginalPrice(product.originalPrice)
+      setDisplayStock(product.stock)
+      setDisplayImages(
+        product.gallery && product.gallery.length > 0 ? product.gallery : product.thumbnail ? [product.thumbnail] : [],
+      )
+    }
+    setSelectedImageIndex(0) // Reset image to first one when variant changes
+    setQuantity(1) // Reset quantity when variant changes
+  }
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -35,9 +64,15 @@ export default function ProductDetailPage() {
         setLoading(true)
         setError(null)
         const response = await apiClient.getProductBySlug(slug)
-
         if (response.success && response.data) {
           setProduct(response.data)
+          if (response.data.variants && response.data.variants.length > 0) {
+            setSelectedVariant(response.data.variants[0]) // Select first variant by default
+            updateDisplayBasedOnSelection(response.data.variants[0])
+          } else {
+            setSelectedVariant(null) // No variants
+            updateDisplayBasedOnSelection(null) // Use base product details
+          }
         } else {
           setError("Product not found")
         }
@@ -54,13 +89,22 @@ export default function ProductDetailPage() {
     }
   }, [slug])
 
+  useEffect(() => {
+    // This effect ensures display values update if product or selectedVariant changes
+    // (e.g., after initial fetch or if product data is refreshed)
+    updateDisplayBasedOnSelection(selectedVariant)
+  }, [product, selectedVariant])
+
   const handleAddToCart = async () => {
     if (!product) return
 
+    // Determine which item to add to cart (variant or base product)
+    const itemToAdd = selectedVariant || product
+
     setIsAddingToCart(true)
     try {
-      addItem(product, quantity)
-      toast.success(`${product.name} added to cart!`)
+      addItem(product, quantity, selectedVariant) // Pass selectedVariant to cart context
+      toast.success(`${itemToAdd.name} added to cart!`)
     } catch (error) {
       console.error("Error adding to cart:", error)
       toast.error("Failed to add item to cart")
@@ -71,7 +115,6 @@ export default function ProductDetailPage() {
 
   const handleToggleWishlist = () => {
     if (!product) return
-
     try {
       toggleItem(product)
       if (isInWishlist(product._id)) {
@@ -84,6 +127,21 @@ export default function ProductDetailPage() {
       toast.error("Failed to update wishlist")
     }
   }
+
+  const handleVariantChange = (variantId: string) => {
+    const variant = product?.variants?.find((v) => v._id === variantId)
+    if (variant) {
+      setSelectedVariant(variant)
+    }
+  }
+
+  const currentImages = displayImages.length > 0 ? displayImages : ["/placeholder.svg?height=600&width=600"]
+  const discountPercentage = displayOriginalPrice
+    ? Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100)
+    : 0
+  const inCart = isInCart(product?._id, selectedVariant?._id)
+  const inWishlist = isInWishlist(product?._id)
+  const cartQuantity = getItemQuantity(product?._id, selectedVariant?._id)
 
   if (loading) {
     return (
@@ -133,53 +191,35 @@ export default function ProductDetailPage() {
     )
   }
 
-  const images =
-    product.gallery && product.gallery.length > 0
-      ? product.gallery
-      : product.thumbnail
-        ? [product.thumbnail]
-        : ["/placeholder.svg?height=600&width=600"]
-
-  const discountPercentage = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-    : 0
-
-  const inCart = isInCart(product._id)
-  const inWishlist = isInWishlist(product._id)
-  const cartQuantity = getItemQuantity(product._id)
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <Button variant="ghost" onClick={() => router.back()} className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Product Images */}
           <div className="space-y-4">
             {/* Main Image */}
             <div className="aspect-square overflow-hidden rounded-lg border">
               <img
-                src={images[selectedImage] || "/placeholder.svg?height=600&width=600"}
+                src={currentImages[selectedImageIndex] || "/placeholder.svg?height=600&width=600"}
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
             </div>
-
             {/* Thumbnail Images */}
-            {images.length > 1 && (
+            {currentImages.length > 1 && (
               <div className="grid grid-cols-4 gap-2">
-                {images.map((image, index) => (
+                {currentImages.map((image, index) => (
                   <button
                     key={index}
-                    onClick={() => setSelectedImage(index)}
+                    onClick={() => setSelectedImageIndex(index)}
                     className={`aspect-square overflow-hidden rounded border-2 ${
-                      selectedImage === index ? "border-primary" : "border-gray-200"
+                      selectedImageIndex === index ? "border-primary" : "border-gray-200"
                     }`}
                   >
                     <img
@@ -192,13 +232,11 @@ export default function ProductDetailPage() {
               </div>
             )}
           </div>
-
           {/* Product Info */}
           <div className="space-y-6">
             {/* Title and Rating */}
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
-
               {product.ratings && product.ratings.count > 0 && (
                 <div className="flex items-center space-x-2 mb-2">
                   <div className="flex items-center">
@@ -216,26 +254,50 @@ export default function ProductDetailPage() {
                   </span>
                 </div>
               )}
-
               {product.shortDescription && <p className="text-gray-600">{product.shortDescription}</p>}
             </div>
-
             {/* Price */}
             <div className="flex items-center space-x-4">
-              <span className="text-3xl font-bold text-gray-900">₹{product.price.toLocaleString()}</span>
-              {product.originalPrice && product.originalPrice > product.price && (
+              <span className="text-3xl font-bold text-gray-900">{formatCurrency(displayPrice)}</span>
+              {displayOriginalPrice && displayOriginalPrice > displayPrice && (
                 <>
-                  <span className="text-xl text-gray-500 line-through">₹{product.originalPrice.toLocaleString()}</span>
+                  <span className="text-xl text-gray-500 line-through">{formatCurrency(displayOriginalPrice)}</span>
                   <Badge className="bg-red-500 hover:bg-red-600">-{discountPercentage}% OFF</Badge>
                 </>
               )}
             </div>
-
             {/* Stock Status */}
-           
-
+            <div className="text-sm font-medium">
+              {displayStock > 0 ? (
+                <span className="text-green-600">In Stock ({displayStock} available)</span>
+              ) : (
+                <span className="text-red-600">Out of Stock</span>
+              )}
+            </div>
+            {/* Variant Selector */}
+            {product.variants && product.variants.length > 0 && (
+              <div className="flex items-center space-x-4">
+                <span className="font-medium">Variant:</span>
+                <Select value={selectedVariant?._id || ""} onValueChange={handleVariantChange}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select Variant">
+                      {selectedVariant
+                        ? selectedVariant.attributes.map((attr) => attr.value).join(" / ")
+                        : "Select Variant"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {product.variants.map((variant) => (
+                      <SelectItem key={variant._id} value={variant._id}>
+                        {variant.attributes.map((attr) => attr.value).join(" / ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {/* Quantity Selector */}
-            {product.stock > 0 && (
+            {displayStock > 0 && (
               <div className="flex items-center space-x-4">
                 <span className="font-medium">Quantity:</span>
                 <div className="flex items-center border rounded-lg">
@@ -251,8 +313,8 @@ export default function ProductDetailPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                    disabled={quantity >= product.stock}
+                    onClick={() => setQuantity(Math.min(displayStock, quantity + 1))}
+                    disabled={quantity >= displayStock}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -260,25 +322,23 @@ export default function ProductDetailPage() {
                 {cartQuantity > 0 && <span className="text-sm text-gray-600">({cartQuantity} in cart)</span>}
               </div>
             )}
-
             {/* Action Buttons */}
             <div className="flex space-x-4">
               <Button
                 onClick={handleAddToCart}
-                disabled={isAddingToCart || product.stock <= 0}
+                disabled={isAddingToCart || displayStock <= 0}
                 className="flex-1"
                 size="lg"
               >
                 <ShoppingCart className="h-5 w-5 mr-2" />
                 {isAddingToCart
                   ? "Adding..."
-                  : product.stock <= 0
+                  : displayStock <= 0
                     ? "Out of Stock"
                     : inCart
                       ? "Add More"
                       : "Add to Cart"}
               </Button>
-
               <Button
                 variant="outline"
                 size="lg"
@@ -288,7 +348,6 @@ export default function ProductDetailPage() {
                 <Heart className={`h-5 w-5 ${inWishlist ? "fill-current" : ""}`} />
               </Button>
             </div>
-
             {/* Features */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -306,15 +365,12 @@ export default function ProductDetailPage() {
             </div>
           </div>
         </div>
-
         {/* Product Details Tabs */}
         <div className="mt-12">
           <Tabs defaultValue="description" className="w-full">
-            <TabsList >
+            <TabsList>
               <TabsTrigger value="description">Description</TabsTrigger>
-      
             </TabsList>
-
             <TabsContent value="description" className="mt-6">
               <Card>
                 <CardContent className="pt-6">
@@ -326,14 +382,9 @@ export default function ProductDetailPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-
-          
-
-         
           </Tabs>
         </div>
       </div>
-
       <Footer />
     </div>
   )
