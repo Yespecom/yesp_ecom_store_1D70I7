@@ -39,19 +39,26 @@ export default function ProductDetailPage() {
   const { toggleItem, isInWishlist } = useWishlist()
 
   // Function to update displayed product details based on selected variant
-  const updateDisplayBasedOnSelection = (variant: ProductVariant | null) => {
+  const updateDisplayBasedOnSelection = (variant: ProductVariant | null, currentProduct: Product | null) => {
+    if (!currentProduct) return
+
     if (variant) {
       setDisplayPrice(variant.price)
       setDisplayOriginalPrice(variant.originalPrice)
       setDisplayStock(variant.stock)
-      setDisplayImages(variant.images && variant.images.length > 0 ? variant.images : product?.gallery || [])
-    } else if (product) {
-      // Fallback to base product details if no variant is selected or product has no variants
-      setDisplayPrice(product.price)
-      setDisplayOriginalPrice(product.originalPrice)
-      setDisplayStock(product.stock)
+      // Prioritize variant images, fall back to product gallery if variant has no images
+      setDisplayImages(variant.images && variant.images.length > 0 ? variant.images : currentProduct.gallery || [])
+    } else {
+      // Use base product details if no variant is selected or product has no variants
+      setDisplayPrice(currentProduct.price)
+      setDisplayOriginalPrice(currentProduct.originalPrice)
+      setDisplayStock(currentProduct.stock)
       setDisplayImages(
-        product.gallery && product.gallery.length > 0 ? product.gallery : product.thumbnail ? [product.thumbnail] : [],
+        currentProduct.gallery && currentProduct.gallery.length > 0
+          ? currentProduct.gallery
+          : currentProduct.thumbnail
+            ? [currentProduct.thumbnail]
+            : [],
       )
     }
     setSelectedImageIndex(0) // Reset image to first one when variant changes
@@ -66,12 +73,12 @@ export default function ProductDetailPage() {
         const response = await apiClient.getProductBySlug(slug)
         if (response.success && response.data) {
           setProduct(response.data)
-          if (response.data.variants && response.data.variants.length > 0) {
+          if (response.data.hasVariants && response.data.variants && response.data.variants.length > 0) {
             setSelectedVariant(response.data.variants[0]) // Select first variant by default
-            updateDisplayBasedOnSelection(response.data.variants[0])
+            updateDisplayBasedOnSelection(response.data.variants[0], response.data)
           } else {
             setSelectedVariant(null) // No variants
-            updateDisplayBasedOnSelection(null) // Use base product details
+            updateDisplayBasedOnSelection(null, response.data) // Use base product details
           }
         } else {
           setError("Product not found")
@@ -92,7 +99,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     // This effect ensures display values update if product or selectedVariant changes
     // (e.g., after initial fetch or if product data is refreshed)
-    updateDisplayBasedOnSelection(selectedVariant)
+    updateDisplayBasedOnSelection(selectedVariant, product)
   }, [product, selectedVariant])
 
   const handleAddToCart = async () => {
@@ -275,7 +282,7 @@ export default function ProductDetailPage() {
               )}
             </div>
             {/* Variant Selector */}
-            {product.variants && product.variants.length > 0 && (
+            {product.hasVariants && product.variants && product.variants.length > 0 && (
               <div className="flex items-center space-x-4">
                 <span className="font-medium">Variant:</span>
                 <Select value={selectedVariant?._id || ""} onValueChange={handleVariantChange}>
