@@ -96,6 +96,9 @@ export default function OrdersPage() {
   const [pagination, setPagination] = useState<any>(null)
   const router = useRouter()
 
+  // Using the storeId from the API base URL as requested
+  const STORE_ID = "1D70I7"
+
   useEffect(() => {
     checkAuth()
   }, [])
@@ -133,8 +136,8 @@ export default function OrdersPage() {
         ...(searchQuery && { search: searchQuery }),
       })
 
-      // API endpoint without storeId, as requested
-      const response = await fetch(`/api/orders?${params}`, {
+      // Corrected API endpoint with storeId, as per documentation
+      const response = await fetch(`/api/store/${STORE_ID}/orders?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -245,8 +248,8 @@ export default function OrdersPage() {
   const handleDownloadInvoice = async (orderId: string) => {
     try {
       const token = localStorage.getItem("auth_token")
-      // API endpoint without storeId, as requested
-      const response = await fetch(`/api/orders/${orderId}/invoice`, {
+      // Corrected API endpoint with storeId, as per documentation
+      const response = await fetch(`/api/store/${STORE_ID}/orders/${orderId}/invoice`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
