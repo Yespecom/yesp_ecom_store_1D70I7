@@ -137,7 +137,7 @@ export default function OrdersPage() {
       })
 
       // Corrected API endpoint with storeId, as per documentation
-      const response = await fetch(`https://api.yespstudio.com/api/${STORE_ID}/orders?${params}`, {
+      const response = await fetch(`https://api.yespstudio.com/api/store/${STORE_ID}/orders?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -146,8 +146,18 @@ export default function OrdersPage() {
 
       if (response.ok) {
         const data: OrdersResponse = await response.json()
-        setOrders(data.data.orders)
-        setPagination(data.data.pagination)
+        console.log("API Response Data:", data) // Log the full response for debugging
+
+        // Validate the expected structure
+        if (data && data.data && Array.isArray(data.data.orders)) {
+          setOrders(data.data.orders)
+          setPagination(data.data.pagination)
+        } else {
+          // Handle unexpected data structure
+          console.error("Unexpected API response structure for orders:", data)
+          setError("Received unexpected data from the server. Please try again.")
+          toast.error("Failed to load orders due to unexpected data.")
+        }
       } else if (response.status === 401) {
         localStorage.removeItem("auth_token")
         localStorage.removeItem("user_data")
@@ -249,7 +259,7 @@ export default function OrdersPage() {
     try {
       const token = localStorage.getItem("auth_token")
       // Corrected API endpoint with storeId, as per documentation
-      const response = await fetch(`https://api.yespstudio.com/api/${STORE_ID}/orders/${orderId}/invoice`, {
+      const response = await fetch(`https://api.yespstudio.com/api/store/${STORE_ID}/orders/${orderId}/invoice`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
