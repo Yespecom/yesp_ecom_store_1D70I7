@@ -209,11 +209,9 @@ export default function ContactPage() {
                   <div>
                     <p className="font-medium text-gray-900">Address</p>
                     <p className="text-gray-600 text-sm">
-                      123 Business District
+                      Mega city Apartments
                       <br />
-                      Mumbai, Maharashtra 400001
-                      <br />
-                      India
+                      Coimbatore, Tamil Nadu
                     </p>
                   </div>
                 </div>
@@ -222,8 +220,7 @@ export default function ContactPage() {
                   <Phone className="h-5 w-5 text-red-600 mt-1 flex-shrink-0" />
                   <div>
                     <p className="font-medium text-gray-900">Phone</p>
-                    <p className="text-gray-600 text-sm">+91 9876543210</p>
-                    <p className="text-gray-600 text-sm">+91 9876543211</p>
+                    <p className="text-gray-600 text-sm">9342624344</p>
                   </div>
                 </div>
 
@@ -231,8 +228,7 @@ export default function ContactPage() {
                   <Mail className="h-5 w-5 text-red-600 mt-1 flex-shrink-0" />
                   <div>
                     <p className="font-medium text-gray-900">Email</p>
-                    <p className="text-gray-600 text-sm">support@oneofwun.com</p>
-                    <p className="text-gray-600 text-sm">info@oneofwun.com</p>
+                    <p className="text-gray-600 text-sm">oneofwun.in@gmail.com</p>
                   </div>
                 </div>
 
