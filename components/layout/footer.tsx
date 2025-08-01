@@ -1,6 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
-import { Facebook, Twitter, Instagram } from "lucide-react"
+import { Instagram } from "lucide-react" // Only import Instagram
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -41,15 +41,11 @@ export function Footer() {
 
           {/* Social Media */}
           <div className="flex gap-3">
-            <Button size="icon" variant="ghost" className="text-gray-400 hover:text-black hover:bg-gray-50">
-              <Instagram className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" className="text-gray-400 hover:text-black hover:bg-gray-50">
-              <Facebook className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" className="text-gray-400 hover:text-black hover:bg-gray-50">
-              <Twitter className="h-4 w-4" />
-            </Button>
+            <Link href="https://www.instagram.com/oneofwun.in?igsh=ZmcyaTBocnh4d3ps" target="_blank" rel="noopener noreferrer">
+              <Button size="icon" variant="ghost" className="text-gray-400 hover:text-black hover:bg-gray-50">
+                <Instagram className="h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -67,7 +63,7 @@ export function Footer() {
 
         {/* Copyright */}
         <div className="text-center text-sm text-gray-500 border-t border-gray-200 pt-6">
-          <p>© 2025 oneofwun. All rights reserved</p>
+          <p>© {currentYear} oneofwun. All rights reserved</p>
         </div>
       </div>
     </footer>
