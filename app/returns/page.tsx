@@ -104,14 +104,14 @@ export default function ReturnsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Shield className="h-5 w-5 text-green-600" />
-                  <span>30-Day Return Guarantee</span>
+                  <span>10-Day Return Guarantee</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-3 gap-4">
                   <div className="text-center p-4 bg-green-50 rounded-lg">
                     <Clock className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                    <h3 className="font-semibold text-gray-900 mb-1">30 Days</h3>
+                    <h3 className="font-semibold text-gray-900 mb-1">10 Days</h3>
                     <p className="text-sm text-gray-600">Return window from delivery date</p>
                   </div>
                   <div className="text-center p-4 bg-blue-50 rounded-lg">
@@ -222,7 +222,7 @@ export default function ReturnsPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-1">Time Limit</h3>
-                      <p className="text-gray-600">Returns must be initiated within 30 days of the delivery date.</p>
+                      <p className="text-gray-600">Returns must be initiated within 10 days of the delivery date.</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
