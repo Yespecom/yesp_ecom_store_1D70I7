@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
@@ -12,11 +12,11 @@ interface HeroSlide {
   subtitle: string
   description: string
   primaryButton: string
-  primaryButtonLink?: string // Added for clarity, though default is /products
+  primaryButtonLink?: string
   badge?: string
   backgroundImage: string
-  secondaryButton?: string // New field for the second button
-  secondaryButtonLink?: string // New field for the second button's link
+  secondaryButton?: string
+  secondaryButtonLink?: string
 }
 
 const heroSlides: HeroSlide[] = [
@@ -37,9 +37,9 @@ const heroSlides: HeroSlide[] = [
     description: "Discover unique styles that make you stand out from the crowd.",
     primaryButton: "Explore Collection",
     primaryButtonLink: "/products",
-    backgroundImage: "/images/models-banner.jpg",
-    secondaryButton: "Customised T-Shirt", // New button text
-    secondaryButtonLink: "/contact", // New button link
+    backgroundImage: "/images/comic-background.jpg", // Updated image
+    secondaryButton: "Customised T-Shirt",
+    secondaryButtonLink: "/contact",
   },
 ]
 
@@ -131,10 +131,10 @@ export function HeroSection() {
         </div>
       </div>
 
-      {/* Navigation Arrows - Hidden on mobile */}
+      {/* Navigation Arrows */}
       <button
         onClick={prevSlide}
-        className="hidden sm:block absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 rounded-full p-2 sm:p-3 transition-all duration-200 backdrop-blur-sm"
+        className="hidden sm:block absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 rounded-full p-2 sm:p-3 transition-all duration-200 backdrop-blur-sm z-20"
         aria-label="Previous slide"
       >
         <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
@@ -142,7 +142,7 @@ export function HeroSection() {
 
       <button
         onClick={nextSlide}
-        className="hidden sm:block absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 rounded-full p-2 sm:p-3 transition-all duration-200 backdrop-blur-sm"
+        className="hidden sm:block absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 rounded-full p-2 sm:p-3 transition-all duration-200 backdrop-blur-sm z-20"
         aria-label="Next slide"
       >
         <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
