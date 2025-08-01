@@ -96,6 +96,9 @@ export default function OrdersPage() {
   const [pagination, setPagination] = useState<any>(null)
   const router = useRouter()
 
+  // Placeholder for storeId - in a real app, this would be dynamic
+  const STORE_ID = "store-123"
+
   useEffect(() => {
     checkAuth()
   }, [])
@@ -133,7 +136,8 @@ export default function OrdersPage() {
         ...(searchQuery && { search: searchQuery }),
       })
 
-      const response = await fetch(`/api/orders?${params}`, {
+      // Corrected API endpoint with storeId
+      const response = await fetch(`/api/store/${STORE_ID}/orders?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -244,7 +248,8 @@ export default function OrdersPage() {
   const handleDownloadInvoice = async (orderId: string) => {
     try {
       const token = localStorage.getItem("auth_token")
-      const response = await fetch(`/api/orders/${orderId}/invoice`, {
+      // Corrected API endpoint with storeId
+      const response = await fetch(`/api/store/${STORE_ID}/orders/${orderId}/invoice`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
