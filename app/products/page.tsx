@@ -1,350 +1,206 @@
-"use client"
-
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
-import { apiClient } from "@/lib/api"
-import { ProductCard } from "@/components/products/product-card"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Search, Grid, List, ChevronLeft, ChevronRight } from "lucide-react"
-import type { Product } from "@/lib/api"
+import { Users, Target, Heart, Truck, Shield, Headphones, RefreshCw } from "lucide-react"
 
-export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState("createdAt")
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalProducts, setTotalProducts] = useState(0)
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const limit = 12
-
-  useEffect(() => {
-    // Get initial params from URL
-    const search = searchParams.get("search") || ""
-    const sort = searchParams.get("sort") || "createdAt"
-    const order = (searchParams.get("order") as "asc" | "desc") || "desc"
-    const page = Number.parseInt(searchParams.get("page") || "1")
-
-    setSearchQuery(search)
-    setSortBy(sort)
-    setSortOrder(order)
-    setCurrentPage(page)
-
-    loadProducts({ search, sort, order, page })
-  }, [searchParams])
-
-  const loadProducts = async (params?: {
-    search?: string
-    sort?: string
-    order?: "asc" | "desc"
-    page?: number
-  }) => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const queryParams = {
-        search: params?.search || searchQuery,
-        sortBy: params?.sort || sortBy,
-        sortOrder: params?.order || sortOrder,
-        page: params?.page || currentPage,
-        limit,
-      }
-
-      console.log("🔍 Loading products with params:", queryParams)
-
-      const response = await apiClient.getProducts(queryParams)
-
-      if (response && response.success && response.data) {
-        setProducts(response.data.products || [])
-        setTotalProducts(response.data.totalProducts || 0)
-        setTotalPages(response.data.totalPages || 1)
-        setCurrentPage(response.data.currentPage || 1)
-      } else {
-        setProducts([])
-        setTotalProducts(0)
-        setTotalPages(1)
-      }
-    } catch (error: any) {
-      console.error("💥 Error fetching products:", error)
-      setError(error.message || "Failed to fetch products")
-      setProducts([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateURL = (params: Record<string, string | number>) => {
-    const url = new URL(window.location.href)
-    Object.entries(params).forEach(([key, value]) => {
-      if (value) {
-        url.searchParams.set(key, value.toString())
-      } else {
-        url.searchParams.delete(key)
-      }
-    })
-    router.push(url.pathname + url.search)
-  }
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setCurrentPage(1)
-    updateURL({ search: searchQuery, sort: sortBy, order: sortOrder, page: "1" })
-  }
-
-  const handleSortChange = (newSortBy: string) => {
-    setSortBy(newSortBy)
-    setCurrentPage(1)
-    updateURL({ search: searchQuery, sort: newSortBy, order: sortOrder, page: "1" })
-  }
-
-  const handleOrderChange = (newOrder: "asc" | "desc") => {
-    setSortOrder(newOrder)
-    setCurrentPage(1)
-    updateURL({ search: searchQuery, sort: sortBy, order: newOrder, page: "1" })
-  }
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    updateURL({ search: searchQuery, sort: sortBy, order: sortOrder, page: page.toString() })
-  }
-
-  const clearSearch = () => {
-    setSearchQuery("")
-    setCurrentPage(1)
-    updateURL({ search: "", sort: sortBy, order: sortOrder, page: "1" })
-  }
-
+export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Products</h1>
-          <p className="text-muted-foreground">Discover our complete collection of premium products</p>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Hero Section */}
+        <div className="text-center mb-16">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">About OneofWun</h1>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            We're passionate about bringing you unique, high-quality products that stand out from the crowd. Every item
+            in our collection is carefully curated to ensure you get something truly special.
+          </p>
         </div>
 
-        {/* Search and Filters */}
-        <div className="mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col lg:flex-row gap-4">
-                {/* Search */}
-                <form onSubmit={handleSearch} className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                    <Input
-                      placeholder="Search products..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </form>
-
-                {/* Sort Options */}
-                <div className="flex gap-2">
-                  <Select value={sortBy} onValueChange={handleSortChange}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="createdAt">Date Added</SelectItem>
-                      <SelectItem value="name">Name</SelectItem>
-                      <SelectItem value="price">Price</SelectItem>
-                      <SelectItem value="ratings.average">Rating</SelectItem>
-                      <SelectItem value="salesCount">Popularity</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={sortOrder} onValueChange={handleOrderChange}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="desc">Descending</SelectItem>
-                      <SelectItem value="asc">Ascending</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  {/* View Mode Toggle */}
-                  <div className="flex border rounded-md">
-                    <Button
-                      variant={viewMode === "grid" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("grid")}
-                      className="rounded-r-none"
-                    >
-                      <Grid className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      className="rounded-l-none"
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Active Filters */}
-              {searchQuery && (
-                <div className="flex items-center gap-2 mt-4">
-                  <span className="text-sm text-muted-foreground">Active filters:</span>
-                  <Badge variant="secondary" className="gap-1">
-                    Search: {searchQuery}
-                    <button onClick={clearSearch} className="ml-1 hover:text-destructive">
-                      ×
-                    </button>
-                  </Badge>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Story Section */}
+        <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Story</h2>
+            <div className="space-y-4 text-gray-600">
+              <p>
+                Founded in 2024, OneofWun started with a simple belief: everyone deserves access to products that are
+                not just functional, but exceptional. We saw a gap in the market for truly unique items that combine
+                quality, style, and affordability.
+              </p>
+              <p>
+                What began as a small team with big dreams has grown into a trusted destination for customers who refuse
+                to settle for ordinary. We work directly with manufacturers and artisans to bring you products you won't
+                find anywhere else.
+              </p>
+              <p>
+                Today, we're proud to serve thousands of customers across India, each one part of our growing community
+                of people who appreciate the extraordinary.
+              </p>
+            </div>
+          </div>
+          <div className="relative">
+            <img
+              src="/placeholder.svg?height=400&width=500&text=Our+Story"
+              alt="Our Story"
+              className="rounded-lg shadow-lg w-full"
+            />
+          </div>
         </div>
 
-        {/* Results Summary */}
-        {!loading && (
-          <div className="flex justify-between items-center mb-6">
-            <p className="text-muted-foreground">
-              {totalProducts > 0
-                ? `Showing ${(currentPage - 1) * limit + 1}-${Math.min(currentPage * limit, totalProducts)} of ${totalProducts} products`
-                : "No products found"}
-            </p>
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div
-            className={`grid gap-6 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"}`}
-          >
-            {Array.from({ length: limit }).map((_, index) => (
-              <Card key={index}>
-                <Skeleton className="aspect-square" />
-                <CardContent className="p-4">
-                  <Skeleton className="h-4 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-1/2 mb-2" />
-                  <Skeleton className="h-6 w-1/3 mb-3" />
-                  <Skeleton className="h-8 w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-destructive mb-4">{error}</p>
-                <Button onClick={() => loadProducts()} variant="outline">
-                  Try Again
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Products Grid/List */}
-        {!loading && !error && products.length > 0 && (
-          <div
-            className={`grid gap-6 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"}`}
-          >
-            {products.map((product) => (
-              <ProductCard key={product._id} product={product} />
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && !error && products.length === 0 && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-muted-foreground mb-4">
-                  {searchQuery ? `No products found for "${searchQuery}"` : "No products available"}
+        {/* Values Section */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">Our Values</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="text-center p-6 hover:shadow-lg transition-shadow">
+              <CardContent className="pt-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Heart className="h-8 w-8 text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">Quality First</h3>
+                <p className="text-gray-600">
+                  We never compromise on quality. Every product goes through rigorous testing to ensure it meets our
+                  high standards.
                 </p>
-                {searchQuery && (
-                  <Button onClick={clearSearch} variant="outline">
-                    Clear Search
-                  </Button>
-                )}
+              </CardContent>
+            </Card>
+
+            <Card className="text-center p-6 hover:shadow-lg transition-shadow">
+              <CardContent className="pt-6">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">Customer Centric</h3>
+                <p className="text-gray-600">
+                  Our customers are at the heart of everything we do. Your satisfaction drives our innovation and
+                  improvement.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="text-center p-6 hover:shadow-lg transition-shadow">
+              <CardContent className="pt-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Target className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">Innovation</h3>
+                <p className="text-gray-600">
+                  We constantly seek new and better ways to serve you, from product selection to delivery experience.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Features Section */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">Why Choose Us</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Truck className="h-6 w-6 text-purple-600" />
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Pagination */}
-        {!loading && !error && totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-8">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage <= 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Previous
-            </Button>
-
-            <div className="flex gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum
-                if (totalPages <= 5) {
-                  pageNum = i + 1
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i
-                } else {
-                  pageNum = currentPage - 2 + i
-                }
-
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handlePageChange(pageNum)}
-                  >
-                    {pageNum}
-                  </Button>
-                )
-              })}
+              <h3 className="font-semibold text-gray-900 mb-2">Fast Delivery</h3>
+              <p className="text-sm text-gray-600">Quick and reliable shipping across India</p>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage >= totalPages}
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="h-6 w-6 text-indigo-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Secure Shopping</h3>
+              <p className="text-sm text-gray-600">Your data and payments are always protected</p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Headphones className="h-6 w-6 text-orange-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">24/7 Support</h3>
+              <p className="text-sm text-gray-600">Always here to help when you need us</p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <RefreshCw className="h-6 w-6 text-teal-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Easy Returns</h3>
+              <p className="text-sm text-gray-600">Hassle-free returns within 30 days</p>
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* Team Section */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">Meet Our Team</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="text-center p-6">
+              <CardContent className="pt-6">
+                <img
+                  src="/placeholder.svg?height=120&width=120&text=CEO"
+                  alt="CEO"
+                  className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                />
+                <h3 className="text-xl font-semibold text-gray-900 mb-1">Rajesh Kumar</h3>
+                <p className="text-red-600 font-medium mb-3">Founder & CEO</p>
+                <p className="text-gray-600 text-sm">
+                  Passionate about bringing unique products to customers across India.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="text-center p-6">
+              <CardContent className="pt-6">
+                <img
+                  src="/placeholder.svg?height=120&width=120&text=CTO"
+                  alt="CTO"
+                  className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                />
+                <h3 className="text-xl font-semibold text-gray-900 mb-1">Priya Sharma</h3>
+                <p className="text-red-600 font-medium mb-3">Chief Technology Officer</p>
+                <p className="text-gray-600 text-sm">
+                  Leading our tech innovation to create the best shopping experience.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="text-center p-6">
+              <CardContent className="pt-6">
+                <img
+                  src="/placeholder.svg?height=120&width=120&text=Head+of+Operations"
+                  alt="Head of Operations"
+                  className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                />
+                <h3 className="text-xl font-semibold text-gray-900 mb-1">Amit Patel</h3>
+                <p className="text-red-600 font-medium mb-3">Head of Operations</p>
+                <p className="text-gray-600 text-sm">Ensuring every order reaches you quickly and safely.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Stats Section */}
+        <div className="bg-white rounded-lg p-8 shadow-sm">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">Our Impact</h2>
+          <div className="grid md:grid-cols-4 gap-8 text-center">
+            <div>
+              <div className="text-3xl font-bold text-red-600 mb-2">50,000+</div>
+              <p className="text-gray-600">Happy Customers</p>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-red-600 mb-2">1,000+</div>
+              <p className="text-gray-600">Unique Products</p>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-red-600 mb-2">25+</div>
+              <p className="text-gray-600">Cities Served</p>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-red-600 mb-2">99.5%</div>
+              <p className="text-gray-600">Customer Satisfaction</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <Footer />
