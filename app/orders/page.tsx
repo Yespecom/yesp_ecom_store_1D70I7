@@ -137,7 +137,7 @@ export default function OrdersPage() {
       })
 
       // Corrected API endpoint with storeId, as per documentation
-      const response = await fetch(`https://api.yespstudio.com/api/store/${STORE_ID}/orders?${params}`, {
+      const response = await fetch(`https://api.yespstudio.com/api/1D70I7/orders?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
