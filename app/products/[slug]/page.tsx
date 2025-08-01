@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -7,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Heart, ShoppingCart, Star, ArrowLeft, Plus, Minus, Truck, Shield, RotateCcw } from "lucide-react"
+import { Heart, ShoppingCart, Star, ArrowLeft, Truck, Shield, RotateCcw } from "lucide-react"
 import { useCart } from "@/lib/cart-context"
 import { useWishlist } from "@/lib/wishlist-context"
 import { Header } from "@/components/layout/header"
@@ -20,22 +19,17 @@ export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string
-
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
   const [displayPrice, setDisplayPrice] = useState(0)
   const [displayOriginalPrice, setDisplayOriginalPrice] = useState<number | undefined>(undefined)
   const [displayStock, setDisplayStock] = useState(0)
   const [displayImages, setDisplayImages] = useState<string[]>([])
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-
-  const [quantity, setQuantity] = useState(1)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
-
-  const { addItem, isInCart, getItemQuantity } = useCart()
+  const { addItem, isInCart } = useCart()
   const { toggleItem, isInWishlist } = useWishlist()
 
   // Function to update displayed product details based on selected variant
@@ -62,7 +56,6 @@ export default function ProductDetailPage() {
       )
     }
     setSelectedImageIndex(0) // Reset image to first one when variant changes
-    setQuantity(1) // Reset quantity when variant changes
   }
 
   useEffect(() => {
@@ -107,10 +100,9 @@ export default function ProductDetailPage() {
 
     // Determine which item to add to cart (variant or base product)
     const itemToAdd = selectedVariant || product
-
     setIsAddingToCart(true)
     try {
-      addItem(product, quantity, selectedVariant) // Pass selectedVariant to cart context
+      addItem(product, 1, selectedVariant) // Always add 1 as quantity
       toast.success(`${itemToAdd.name} added to cart!`)
     } catch (error) {
       console.error("Error adding to cart:", error)
@@ -148,7 +140,6 @@ export default function ProductDetailPage() {
     : 0
   const inCart = isInCart(product?._id, selectedVariant?._id)
   const inWishlist = isInWishlist(product?._id)
-  const cartQuantity = getItemQuantity(product?._id, selectedVariant?._id)
 
   if (loading) {
     return (
@@ -288,45 +279,17 @@ export default function ProductDetailPage() {
                 <Select value={selectedVariant?._id || ""} onValueChange={handleVariantChange}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Select Variant">
-                      {selectedVariant
-                        ? selectedVariant.options.map((attr) => attr.value).join(" / ")
-                        : "Select Variant"}
+                      {selectedVariant ? selectedVariant.name : "Select Variant"}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {product.variants.map((variant) => (
                       <SelectItem key={variant._id} value={variant._id}>
-                        {variant.options.map((attr) => attr.value).join(" / ")}
+                        {variant.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
-            {/* Quantity Selector */}
-            {displayStock > 0 && (
-              <div className="flex items-center space-x-4">
-                <span className="font-medium">Quantity:</span>
-                <div className="flex items-center border rounded-lg">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={quantity <= 1}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="px-4 py-2 font-medium">{quantity}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setQuantity(Math.min(displayStock, quantity + 1))}
-                    disabled={quantity >= displayStock}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {cartQuantity > 0 && <span className="text-sm text-gray-600">({cartQuantity} in cart)</span>}
               </div>
             )}
             {/* Action Buttons */}
@@ -343,7 +306,7 @@ export default function ProductDetailPage() {
                   : displayStock <= 0
                     ? "Out of Stock"
                     : inCart
-                      ? "Add More"
+                      ? "Added to Cart" // Changed to reflect item is already in cart
                       : "Add to Cart"}
               </Button>
               <Button
