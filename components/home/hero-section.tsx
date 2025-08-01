@@ -12,8 +12,11 @@ interface HeroSlide {
   subtitle: string
   description: string
   primaryButton: string
+  primaryButtonLink?: string // Added for clarity, though default is /products
   badge?: string
   backgroundImage: string
+  secondaryButton?: string // New field for the second button
+  secondaryButtonLink?: string // New field for the second button's link
 }
 
 const heroSlides: HeroSlide[] = [
@@ -23,6 +26,7 @@ const heroSlides: HeroSlide[] = [
     subtitle: "Fresh & Trendy",
     description: "Light, breezy and perfect for the season. Explore our summer essentials.",
     primaryButton: "Shop Now",
+    primaryButtonLink: "/products",
     badge: "NEW",
     backgroundImage: "/images/models-banner.jpg",
   },
@@ -32,7 +36,10 @@ const heroSlides: HeroSlide[] = [
     subtitle: "oneofwun",
     description: "Discover unique styles that make you stand out from the crowd.",
     primaryButton: "Explore Collection",
+    primaryButtonLink: "/products",
     backgroundImage: "/images/models-banner.jpg",
+    secondaryButton: "Customised T-Shirt", // New button text
+    secondaryButtonLink: "/contact", // New button link
   },
 ]
 
@@ -55,11 +62,17 @@ export function HeroSection() {
     setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length)
   }
 
-  const handleButtonClick = () => {
-    router.push("/products")
+  const slide = heroSlides[currentSlide]
+
+  const handlePrimaryButtonClick = () => {
+    router.push(slide.primaryButtonLink || "/products")
   }
 
-  const slide = heroSlides[currentSlide]
+  const handleSecondaryButtonClick = () => {
+    if (slide.secondaryButtonLink) {
+      router.push(slide.secondaryButtonLink)
+    }
+  }
 
   return (
     <div className="relative h-[400px] sm:h-[500px] md:h-[600px] lg:h-[700px] bg-gray-100 overflow-hidden rounded-lg mx-2 sm:mx-4 md:mx-8 mt-2 sm:mt-4">
@@ -98,14 +111,22 @@ export function HeroSection() {
             {slide.description}
           </p>
 
-          {/* Single Button */}
-          <div className="flex justify-center">
+          {/* Buttons Container */}
+          <div className="flex justify-center gap-4">
             <Button
-              onClick={handleButtonClick}
+              onClick={handlePrimaryButtonClick}
               className="bg-red-600 hover:bg-red-700 text-white px-4 sm:px-6 md:px-8 h-9 sm:h-11 md:h-12 text-sm sm:text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200 rounded-lg"
             >
               {slide.primaryButton}
             </Button>
+            {slide.secondaryButton && (
+              <Button
+                onClick={handleSecondaryButtonClick}
+                className="bg-white/20 hover:bg-white/30 text-white px-4 sm:px-6 md:px-8 h-9 sm:h-11 md:h-12 text-sm sm:text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200 rounded-lg border border-white/30"
+              >
+                {slide.secondaryButton}
+              </Button>
+            )}
           </div>
         </div>
       </div>
