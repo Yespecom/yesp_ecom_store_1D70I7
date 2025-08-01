@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,23 +9,39 @@ import { Heart, ShoppingCart, Star } from "lucide-react"
 import { useCart } from "@/lib/cart-context"
 import { useWishlist } from "@/lib/wishlist-context"
 import { toast } from "sonner"
-import type { Product } from "@/lib/api"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { formatCurrency } from "@/lib/utils"
+import type { Product as ApiProduct, ProductVariant as ApiProductVariant } from "@/lib/api"
 
 interface ProductCardProps {
-  product: Product
+  product: ApiProduct
 }
 
 export function ProductCard({ product }: ProductCardProps) {
   const { addItem, isInCart } = useCart()
   const { toggleItem, isInWishlist } = useWishlist()
   const [isAddingToCart, setIsAddingToCart] = useState(false)
+  const [selectedVariant, setSelectedVariant] = useState<ApiProductVariant | null>(null)
+
+  useEffect(() => {
+    if (product.variants && product.variants.length > 0) {
+      setSelectedVariant(product.variants[0])
+    } else {
+      setSelectedVariant(null)
+    }
+  }, [product.variants])
+
+  const displayPrice = selectedVariant ? selectedVariant.price : product.price
+  const displayOriginalPrice = selectedVariant ? selectedVariant.originalPrice : product.originalPrice
+  const displayThumbnail = selectedVariant?.images?.[0] || product.thumbnail || "/placeholder.svg?height=300&width=400"
+  const displayStock = selectedVariant ? selectedVariant.stock : product.stock
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setIsAddingToCart(true)
     try {
-      addItem(product, 1)
+      addItem(product, 1, selectedVariant) // Pass selectedVariant to cart
       toast.success(`${product.name} added to cart!`)
     } catch (error) {
       console.error("Error adding to cart:", error)
@@ -51,7 +67,7 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   }
 
-  const inCart = isInCart(product._id)
+  const inCart = isInCart(product._id, selectedVariant?._id)
   const inWishlist = isInWishlist(product._id)
 
   return (
@@ -59,11 +75,10 @@ export function ProductCard({ product }: ProductCardProps) {
       <Link href={`/products/${product.slug}`}>
         <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">
           <img
-            src={product.thumbnail || "/placeholder.svg?height=300&width=400"}
+            src={displayThumbnail || "/placeholder.svg"}
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
-
           {/* Wishlist Button */}
           <Button
             variant="ghost"
@@ -77,14 +92,12 @@ export function ProductCard({ product }: ProductCardProps) {
           >
             <Heart className={`h-4 w-4 ${inWishlist ? "fill-current" : ""}`} />
           </Button>
-
           {/* Stock Status */}
-          {product.stock <= 0 && (
+          {displayStock <= 0 && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
               <div className="bg-white text-gray-900 font-medium px-3 py-1 rounded-md text-sm">Out of Stock</div>
             </div>
           )}
-
           {/* Hover Description Overlay */}
           {product.shortDescription && (
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent p-4 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
@@ -93,7 +106,6 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
       </Link>
-
       <CardContent className="p-5 space-y-4">
         <Link href={`/products/${product.slug}`}>
           <div className="space-y-3">
@@ -101,7 +113,6 @@ export function ProductCard({ product }: ProductCardProps) {
             <h3 className="font-semibold text-gray-900 line-clamp-2 hover:text-gray-700 transition-colors leading-tight text-base">
               {product.name}
             </h3>
-
             {/* Rating */}
             {product.ratings && product.ratings.count > 0 && (
               <div className="flex items-center space-x-2">
@@ -118,21 +129,44 @@ export function ProductCard({ product }: ProductCardProps) {
                 <span className="text-sm text-gray-500">({product.ratings.count})</span>
               </div>
             )}
-
             {/* Price */}
             <div className="flex items-baseline space-x-2">
-              <span className="font-bold text-xl text-gray-900">₹{product.price.toLocaleString()}</span>
-              {product.originalPrice && product.originalPrice > product.price && (
-                <span className="text-sm text-gray-400 line-through">₹{product.originalPrice.toLocaleString()}</span>
+              <span className="font-bold text-xl text-gray-900">{formatCurrency(displayPrice)}</span>
+              {displayOriginalPrice && displayOriginalPrice > displayPrice && (
+                <span className="text-sm text-gray-400 line-through">{formatCurrency(displayOriginalPrice)}</span>
               )}
             </div>
           </div>
         </Link>
-
+        {/* Variant Selector */}
+        {product.variants && product.variants.length > 0 && (
+          <Select
+            value={selectedVariant?._id || ""}
+            onValueChange={(variantId) => {
+              const variant = product.variants?.find((v) => v._id === variantId)
+              if (variant) {
+                setSelectedVariant(variant)
+              }
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select Variant">
+                {selectedVariant ? selectedVariant.options.map((attr) => attr.value).join(" / ") : "Select Variant"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {product.variants.map((variant) => (
+                <SelectItem key={variant._id} value={variant._id}>
+                  {variant.options.map((attr) => attr.value).join(" / ")} - {formatCurrency(variant.price)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {/* Add to Cart Button */}
         <Button
           onClick={handleAddToCart}
-          disabled={isAddingToCart || product.stock <= 0}
+          disabled={isAddingToCart || displayStock <= 0}
           className={`w-full h-11 font-semibold transition-all duration-200 ${
             inCart
               ? "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
@@ -148,7 +182,7 @@ export function ProductCard({ product }: ProductCardProps) {
           ) : (
             <div className="flex items-center space-x-2">
               <ShoppingCart className="h-4 w-4" />
-              <span>{inCart ? "In Cart" : product.stock <= 0 ? "Out of Stock" : "Add to Cart"}</span>
+              <span>{inCart ? "In Cart" : displayStock <= 0 ? "Out of Stock" : "Add to Cart"}</span>
             </div>
           )}
         </Button>
