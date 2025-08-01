@@ -40,11 +40,7 @@ export default function AboutPage() {
             </div>
           </div>
           <div className="relative">
-            <img
-              src="/placeholder.svg?height=400&width=500&text=Our+Story"
-              alt="Our Story"
-              className="rounded-lg shadow-lg w-full"
-            />
+            <img src="/placeholder.svg?height=400&width=500" alt="Our Story" className="rounded-lg shadow-lg w-full" />
           </div>
         </div>
 
@@ -125,79 +121,7 @@ export default function AboutPage() {
                 <RefreshCw className="h-6 w-6 text-teal-600" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-2">Easy Returns</h3>
-              <p className="text-sm text-gray-600">Hassle-free returns within 30 days</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Team Section */}
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">Meet Our Team</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="text-center p-6">
-              <CardContent className="pt-6">
-                <img
-                  src="/placeholder.svg?height=120&width=120&text=CEO"
-                  alt="CEO"
-                  className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-                />
-                <h3 className="text-xl font-semibold text-gray-900 mb-1">Rajesh Kumar</h3>
-                <p className="text-red-600 font-medium mb-3">Founder & CEO</p>
-                <p className="text-gray-600 text-sm">
-                  Passionate about bringing unique products to customers across India.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-6">
-              <CardContent className="pt-6">
-                <img
-                  src="/placeholder.svg?height=120&width=120&text=CTO"
-                  alt="CTO"
-                  className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-                />
-                <h3 className="text-xl font-semibold text-gray-900 mb-1">Priya Sharma</h3>
-                <p className="text-red-600 font-medium mb-3">Chief Technology Officer</p>
-                <p className="text-gray-600 text-sm">
-                  Leading our tech innovation to create the best shopping experience.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-6">
-              <CardContent className="pt-6">
-                <img
-                  src="/placeholder.svg?height=120&width=120&text=Head+of+Operations"
-                  alt="Head of Operations"
-                  className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-                />
-                <h3 className="text-xl font-semibold text-gray-900 mb-1">Amit Patel</h3>
-                <p className="text-red-600 font-medium mb-3">Head of Operations</p>
-                <p className="text-gray-600 text-sm">Ensuring every order reaches you quickly and safely.</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Stats Section */}
-        <div className="bg-white rounded-lg p-8 shadow-sm">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">Our Impact</h2>
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-3xl font-bold text-red-600 mb-2">50,000+</div>
-              <p className="text-gray-600">Happy Customers</p>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-red-600 mb-2">1,000+</div>
-              <p className="text-gray-600">Unique Products</p>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-red-600 mb-2">25+</div>
-              <p className="text-gray-600">Cities Served</p>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-red-600 mb-2">99.5%</div>
-              <p className="text-gray-600">Customer Satisfaction</p>
+              <p className="text-sm text-gray-600">Hassle-free returns within 10 days</p>
             </div>
           </div>
         </div>
