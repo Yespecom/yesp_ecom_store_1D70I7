@@ -90,7 +90,7 @@ export default function OrdersPage() {
       setLoading(true)
       setError(null)
       const response = await fetch(
-        `https://api.yespstudio.com/api/store/${STORE_ID}/orders?page=${currentPage}&limit=5`,
+        `https://api.yespstudio.com/api/${STORE_ID}/orders?page=${currentPage}&limit=5`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
