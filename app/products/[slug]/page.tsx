@@ -1,4 +1,5 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -19,16 +20,18 @@ export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string
+
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
   const [displayPrice, setDisplayPrice] = useState(0)
   const [displayOriginalPrice, setDisplayOriginalPrice] = useState<number | undefined>(undefined)
-  const [displayStock, setDisplayStock] = useState(0)
+  const [displayStock, setDisplayStock] = useState(0) // Keep for internal logic if needed, but not displayed
   const [displayImages, setDisplayImages] = useState<string[]>([])
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
+
   const { addItem, isInCart } = useCart()
   const { toggleItem, isInWishlist } = useWishlist()
 
@@ -39,14 +42,14 @@ export default function ProductDetailPage() {
     if (variant) {
       setDisplayPrice(variant.price)
       setDisplayOriginalPrice(variant.originalPrice)
-      setDisplayStock(variant.stock)
+      setDisplayStock(variant.stock || 0) // Update stock for internal logic
       // Prioritize variant images, fall back to product gallery if variant has no images
       setDisplayImages(variant.images && variant.images.length > 0 ? variant.images : currentProduct.gallery || [])
     } else {
       // Use base product details if no variant is selected or product has no variants
       setDisplayPrice(currentProduct.price)
       setDisplayOriginalPrice(currentProduct.originalPrice)
-      setDisplayStock(currentProduct.stock)
+      setDisplayStock(currentProduct.stock || 0) // Update stock for internal logic
       setDisplayImages(
         currentProduct.gallery && currentProduct.gallery.length > 0
           ? currentProduct.gallery
@@ -115,8 +118,8 @@ export default function ProductDetailPage() {
   const handleToggleWishlist = () => {
     if (!product) return
     try {
-      toggleItem(product)
-      if (isInWishlist(product._id)) {
+      toggleItem(product, selectedVariant) // Pass selectedVariant to wishlist
+      if (isInWishlist(product._id, selectedVariant?._id)) {
         toast.success("Removed from wishlist")
       } else {
         toast.success("Added to wishlist")
@@ -138,8 +141,9 @@ export default function ProductDetailPage() {
   const discountPercentage = displayOriginalPrice
     ? Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100)
     : 0
+
   const inCart = isInCart(product?._id, selectedVariant?._id)
-  const inWishlist = isInWishlist(product?._id)
+  const inWishlist = isInWishlist(product?._id, selectedVariant?._id)
 
   if (loading) {
     return (
@@ -264,14 +268,7 @@ export default function ProductDetailPage() {
                 </>
               )}
             </div>
-            {/* Stock Status */}
-            <div className="text-sm font-medium">
-              {displayStock > 0 ? (
-                <span className="text-green-600">In Stock ({displayStock} available)</span>
-              ) : (
-                <span className="text-red-600">Out of Stock</span>
-              )}
-            </div>
+            {/* Removed Stock Status */}
             {/* Variant Selector */}
             {product.hasVariants && product.variants && product.variants.length > 0 && (
               <div className="flex items-center space-x-4">
@@ -296,17 +293,17 @@ export default function ProductDetailPage() {
             <div className="flex space-x-4">
               <Button
                 onClick={handleAddToCart}
-                disabled={isAddingToCart || displayStock <= 0}
+                disabled={isAddingToCart || displayStock <= 0} // Keep disabled logic based on stock
                 className="flex-1"
                 size="lg"
               >
                 <ShoppingCart className="h-5 w-5 mr-2" />
                 {isAddingToCart
                   ? "Adding..."
-                  : displayStock <= 0
+                  : displayStock <= 0 // Keep stock check for button text
                     ? "Out of Stock"
                     : inCart
-                      ? "Added to Cart" // Changed to reflect item is already in cart
+                      ? "Added to Cart"
                       : "Add to Cart"}
               </Button>
               <Button
