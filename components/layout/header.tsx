@@ -32,15 +32,25 @@ import {
 import { useCart } from "@/lib/cart-context"
 import { toast } from "sonner"
 
-interface WishlistItem {
+// New: Define ProductVariant interface
+interface ProductVariant {
   _id: string
-  name: string
+  name: string // e.g., "Red, Large"
+  price: number
+  originalPrice?: number
+  stock?: number
+  // Add other variant-specific properties if needed, like color, size, etc.
+}
+
+interface WishlistItem {
+  _id: string // Product ID
+  name: string // Product Name
   description?: string
   shortDescription?: string
   slug: string
   sku?: string
-  price: number
-  originalPrice?: number
+  price: number // This should be the price of the selected variant, or base product price
+  originalPrice?: number // This should be the original price of the selected variant, or base product original price
   category?: {
     _id: string
     name: string
@@ -48,7 +58,7 @@ interface WishlistItem {
   }
   gallery?: string[]
   thumbnail: string
-  stock?: number
+  stock?: number // This should be the stock of the selected variant, or base product stock
   isActive?: boolean
   isFeatured?: boolean
   tags?: string[]
@@ -60,10 +70,31 @@ interface WishlistItem {
   viewCount?: number
   createdAt?: string
   updatedAt?: string
+  selectedVariant?: ProductVariant // New: Stores details of the chosen variant
 }
 
 interface LocalWishlist {
   items: WishlistItem[]
+}
+
+// Infer CartProduct and CartItem structure based on useCart context and new variant concept
+interface CartProduct {
+  _id: string
+  name: string
+  price: number
+  thumbnail: string
+  slug: string
+  description?: string
+  shortDescription?: string
+  stock?: number
+  category?: { _id: string; name: string; slug: string }
+  selectedVariant?: ProductVariant // New: The specific variant added to cart
+}
+
+// Assuming useCart's state.items is an array of this structure
+interface CartItem {
+  product: CartProduct
+  quantity: number
 }
 
 export function Header() {
@@ -74,7 +105,6 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
-
   const { state: cartState, removeItem, updateQuantity, clearCart, addItem } = useCart()
 
   useEffect(() => {
@@ -158,21 +188,21 @@ export function Header() {
 
   const handleAddToCartFromWishlist = (product: WishlistItem) => {
     try {
-      // Convert wishlist item to cart-compatible format
-      const cartProduct = {
+      // Convert wishlist item to cart-compatible format, passing selectedVariant
+      const cartProduct: CartProduct = {
         _id: product._id,
         name: product.name,
-        price: product.price,
+        price: product.price, // This should already be the variant price if selected
         thumbnail: product.thumbnail,
         slug: product.slug,
         description: product.description,
         shortDescription: product.shortDescription,
-        stock: product.stock,
+        stock: product.stock, // This should already be the variant stock if selected
         category: product.category,
+        selectedVariant: product.selectedVariant, // Pass the selected variant details
       }
-
       addItem(cartProduct, 1)
-      toast.success(`${product.name} added to cart!`)
+      toast.success(`${getProductName(product)} added to cart!`)
     } catch (error) {
       console.error("Error adding to cart:", error)
       toast.error("Failed to add item to cart")
@@ -210,12 +240,14 @@ export function Header() {
     return `/products/${product.slug || product._id || "unknown"}`
   }
 
-  // Helper function to safely get product name
+  // Helper function to safely get product name (now considering variant)
   const getProductName = (product: WishlistItem) => {
-    return product?.name || "Unknown Product"
+    return product?.selectedVariant?.name
+      ? `${product.name} (${product.selectedVariant.name})`
+      : product?.name || "Unknown Product"
   }
 
-  // Helper function to safely get product price
+  // Helper function to safely get product price (uses the price field which should reflect variant price)
   const getProductPrice = (product: WishlistItem) => {
     return product?.price || 0
   }
@@ -377,7 +409,7 @@ export function Header() {
                                 onClick={() => setIsWishlistOpen(false)}
                               >
                                 <h4 className="font-semibold text-gray-900 line-clamp-2 hover:text-red-600 transition-colors duration-200 mb-2 leading-tight">
-                                  {getProductName(item)}
+                                  {getProductName(item)} {/* Uses updated helper */}
                                 </h4>
                               </Link>
                               <div className="flex items-center justify-between mb-3">
@@ -391,7 +423,6 @@ export function Header() {
                                     </p>
                                   )}
                                 </div>
-                             
                               </div>
 
                               {/* Action Buttons */}
@@ -416,7 +447,6 @@ export function Header() {
                               </div>
                             </div>
                           </div>
-
                           {/* Hover Effect Border */}
                           <div className="absolute inset-0 rounded-xl border-2 border-transparent group-hover:border-red-100 transition-colors duration-200 pointer-events-none" />
                         </div>
@@ -495,7 +525,10 @@ export function Header() {
                             />
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-sm text-gray-900 line-clamp-2 mb-1">
-                                {item.product.name || "Unknown Product"}
+                                {item.product.selectedVariant?.name
+                                  ? `${item.product.name} (${item.product.selectedVariant.name})`
+                                  : item.product.name || "Unknown Product"}{" "}
+                                {/* Display variant name if present */}
                               </h4>
                               <p className="text-sm text-gray-600 mb-3">
                                 ₹{(item.product.price || 0).toLocaleString()}
