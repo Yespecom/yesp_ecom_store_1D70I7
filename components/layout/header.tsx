@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet" // Added SheetDescription
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Search, ShoppingCart, Heart, User, Menu, X, Plus, Minus, LogOut, Package, UserCircle, Trash2 } from 'lucide-react'
 import { useCart } from "@/lib/cart-context"
 import { toast } from "sonner"
@@ -179,12 +179,12 @@ export function Header() {
       const cartProduct: CartProduct = {
         _id: product._id,
         name: product.name,
-        price: getProductPrice(product), // Use the helper to get the correct price
+        price: product.price, // This should already be the variant price if selected
         thumbnail: product.thumbnail,
         slug: product.slug,
         description: product.description,
         shortDescription: product.shortDescription,
-        stock: getProductStock(product), // Use the helper to get the correct stock
+        stock: product.stock, // This should already be the variant stock if selected
         category: product.category,
         selectedVariant: product.selectedVariant, // Pass the selected variant details
       }
@@ -234,19 +234,9 @@ export function Header() {
       : product?.name || "Unknown Product"
   }
 
-  // Helper function to safely get product price (prioritizes variant price)
+  // Helper function to safely get product price (uses the price field which should reflect variant price)
   const getProductPrice = (product: WishlistItem | CartProduct) => {
-    return product?.selectedVariant?.price ?? product?.price ?? 0
-  }
-
-  // Helper function to safely get product original price (prioritizes variant original price)
-  const getProductOriginalPrice = (product: WishlistItem | CartProduct) => {
-    return product?.selectedVariant?.originalPrice ?? product?.originalPrice
-  }
-
-  // Helper function to safely get product stock (prioritizes variant stock)
-  const getProductStock = (product: WishlistItem | CartProduct) => {
-    return product?.selectedVariant?.stock ?? product?.stock ?? 0
+    return product?.price || 0
   }
 
   // Helper function to safely get product thumbnail
@@ -330,9 +320,9 @@ export function Header() {
                       </div>
                       <div>
                         <SheetTitle className="text-left text-lg font-bold text-gray-900">My Wishlist</SheetTitle>
-                        <SheetDescription className="text-left text-sm text-gray-600">
-                          Items you've saved for later.
-                        </SheetDescription>
+                        <p className="text-sm text-gray-600">
+                          {wishlistItems.length} {wishlistItems.length === 1 ? "item" : "items"} saved
+                        </p>
                       </div>
                     </div>
                     {wishlistItems.length > 0 && (
@@ -414,9 +404,9 @@ export function Header() {
                                   <p className="text-lg font-bold text-gray-900">
                                     ₹{getProductPrice(item).toLocaleString()}
                                   </p>
-                                  {getProductOriginalPrice(item) && getProductOriginalPrice(item)! > getProductPrice(item) && (
+                                  {item.originalPrice && item.originalPrice > item.price && (
                                     <p className="text-sm text-gray-500 line-through">
-                                      ₹{getProductOriginalPrice(item)!.toLocaleString()}
+                                      ₹{item.originalPrice.toLocaleString()}
                                     </p>
                                   )}
                                 </div>
@@ -427,10 +417,11 @@ export function Header() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleAddToCartFromWishlist(item)}
-                                  className="flex-1 h-9 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
+                                  disabled={item.stock === 0}
+                                  className="flex-1 h-9 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   <ShoppingCart className="h-3 w-3 mr-1" />
-                                  Add to Cart {/* Always show "Add to Cart" */}
+                                  {item.stock === 0 ? "Out of Stock" : "Add to Cart"}
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -459,7 +450,7 @@ export function Header() {
                         <span className="font-medium">{wishlistItems.length}</span> items in wishlist
                       </div>
                       <div className="text-xs text-gray-500">
-                        Total value: ₹{wishlistItems.reduce((total, item) => total + getProductPrice(item), 0).toLocaleString()}
+                        Total value: ₹{wishlistItems.reduce((total, item) => total + item.price, 0).toLocaleString()}
                       </div>
                     </div>
                     <Button
@@ -492,9 +483,6 @@ export function Header() {
                   <SheetTitle className="text-left">
                     Shopping Cart ({cartState.itemCount} {cartState.itemCount === 1 ? "item" : "items"})
                   </SheetTitle>
-                  <SheetDescription className="text-left text-sm text-gray-600">
-                    Review your items before checkout.
-                  </SheetDescription>
                 </SheetHeader>
                 <div className="flex-1 overflow-y-auto py-4">
                   {cartState.items.length === 0 ? (
@@ -512,82 +500,80 @@ export function Header() {
                     <div className="space-y-4">
                       {cartState.items
                         .filter((item) => item && item.product) // Filter out invalid items
-                        .map((item) => {
-                          return (
-                            <div
-                              // Use a unique key that includes variant ID if present
-                              key={
-                                item.product.selectedVariant
-                                  ? `${item.product._id}-${item.product.selectedVariant._id}`
-                                  : item.product._id
-                              }
-                              className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50"
-                            >
-                              <img
-                                src={getProductThumbnail(item.product) || "/placeholder.svg"}
-                                alt={getProductName(item.product) || "Product"}
-                                className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-sm text-gray-900 line-clamp-2 mb-1">
-                                  {getProductName(item.product)}{" "}
-                                  {/* Display variant name if present */}
-                                </h4>
-                                <p className="text-sm text-gray-600 mb-3">
-                                  ₹{(getProductPrice(item.product) || 0).toLocaleString()}
-                                </p>
-                                <div className="flex items-center space-x-3">
-                                  <div className="flex items-center space-x-2 border border-gray-200 rounded-lg bg-white">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleQuantityChange(
-                                          item.product._id || "",
-                                          item.quantity - 1,
-                                          item.product.selectedVariant?._id, // Pass variantId
-                                        )
-                                      }
-                                      className="h-8 w-8 p-0 hover:bg-gray-100"
-                                    >
-                                      <Minus className="h-3 w-3" />
-                                    </Button>
-                                    <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleQuantityChange(
-                                          item.product._id || "",
-                                          item.quantity + 1,
-                                          item.product.selectedVariant?._id, // Pass variantId
-                                        )
-                                      }
-                                      className="h-8 w-8 p-0 hover:bg-gray-100"
-                                    >
-                                      <Plus className="h-3 w-3" />
-                                    </Button>
-                                  </div>
+                        .map((item) => (
+                          <div
+                            // Use a unique key that includes variant ID if present
+                            key={
+                              item.product.selectedVariant
+                                ? `${item.product._id}-${item.product.selectedVariant._id}`
+                                : item.product._id
+                            }
+                            className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50"
+                          >
+                            <img
+                              src={getProductThumbnail(item.product) || "/placeholder.svg"}
+                              alt={getProductName(item.product) || "Product"}
+                              className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm text-gray-900 line-clamp-2 mb-1">
+                                {getProductName(item.product)}{" "}
+                                {/* Display variant name if present */}
+                              </h4>
+                              <p className="text-sm text-gray-600 mb-3">
+                                ₹{(getProductPrice(item.product) || 0).toLocaleString()}
+                              </p>
+                              <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-2 border border-gray-200 rounded-lg bg-white">
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() =>
-                                      removeItem(item.product._id || "", item.product.selectedVariant?._id)
+                                      handleQuantityChange(
+                                        item.product._id || "",
+                                        item.quantity - 1,
+                                        item.product.selectedVariant?._id, // Pass variantId
+                                      )
                                     }
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                                    className="h-8 w-8 p-0 hover:bg-gray-100"
                                   >
-                                    <X className="h-4 w-4" />
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleQuantityChange(
+                                        item.product._id || "",
+                                        item.quantity + 1,
+                                        item.product.selectedVariant?._id, // Pass variantId
+                                      )
+                                    }
+                                    className="h-8 w-8 p-0 hover:bg-gray-100"
+                                  >
+                                    <Plus className="h-3 w-3" />
                                   </Button>
                                 </div>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <p className="font-semibold text-gray-900">
-                                  ₹{((getProductPrice(item.product) || 0) * item.quantity).toLocaleString()}
-                                </p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    removeItem(item.product._id || "", item.product.selectedVariant?._id)
+                                  } {/* Pass variantId */}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
                               </div>
                             </div>
-                          )
-                        })}
+                            <div className="text-right flex-shrink-0">
+                              <p className="font-semibold text-gray-900">
+                                ₹{((getProductPrice(item.product) || 0) * item.quantity).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -699,9 +685,6 @@ export function Header() {
               <SheetContent side="left" className="w-80">
                 <SheetHeader className="border-b pb-4">
                   <SheetTitle className="text-left">Menu</SheetTitle>
-                  <SheetDescription className="text-left text-sm text-gray-600">
-                    Navigate through the store.
-                  </SheetDescription>
                 </SheetHeader>
                 <div className="py-6 space-y-6">
                   {user && (
