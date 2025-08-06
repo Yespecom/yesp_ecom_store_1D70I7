@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { createContext, useContext, useReducer, useEffect } from "react"
 import type { Product as ApiProduct, ProductVariant as ApiProductVariant } from "./api" // Assuming these types are defined in your lib/api.ts
@@ -41,7 +40,6 @@ function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD_ITEM": {
       const { product, quantity = 1, selectedVariant } = action.payload
-
       // Determine the unique identifier for the item (product ID + variant ID if applicable)
       const itemId = selectedVariant ? `${product._id}-${selectedVariant._id}` : product._id
       console.log("ADD_ITEM: Calculated itemId:", itemId)
@@ -83,7 +81,6 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
       const total = newItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0)
-
       console.log("ADD_ITEM: New State:", { items: newItems, total, itemCount })
       return {
         items: newItems,
@@ -103,9 +100,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         console.log(`  Comparing item: ${itemUniqueId} with target: ${targetUniqueId}`)
         return itemUniqueId !== targetUniqueId
       })
+
       const total = newItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0)
-
       console.log("REMOVE_ITEM: New State:", { items: newItems, total, itemCount })
       return {
         items: newItems,
@@ -128,12 +125,11 @@ function cartReducer(state: CartState, action: CartAction): CartState {
           : item.product._id
         const targetUniqueId = variantId ? `${productId}-${variantId}` : productId
         console.log(`  Comparing item: ${itemUniqueId} with target: ${targetUniqueId}`)
-
         return itemUniqueId === targetUniqueId ? { ...item, quantity } : item
       })
+
       const total = newItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0)
-
       console.log("UPDATE_QUANTITY: New State:", { items: newItems, total, itemCount })
       return {
         items: newItems,
@@ -165,7 +161,7 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, initialState)
+  const [state, dispatch] = useReducer(cartReducer, initialState) // [^2]
 
   // Load cart from localStorage on mount
   useEffect(() => {
