@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
@@ -15,20 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import {
-  Search,
-  ShoppingCart,
-  Heart,
-  User,
-  Menu,
-  X,
-  Plus,
-  Minus,
-  LogOut,
-  Package,
-  UserCircle,
-  Trash2,
-} from "lucide-react"
+import { Search, ShoppingCart, Heart, User, Menu, X, Plus, Minus, LogOut, Package, UserCircle, Trash2 } from 'lucide-react'
 import { useCart } from "@/lib/cart-context"
 import { toast } from "sonner"
 
@@ -172,12 +158,13 @@ export function Header() {
     router.push("/")
   }
 
-  const handleQuantityChange = (productId: string, newQuantity: number) => {
+  // Updated to pass variantId
+  const handleQuantityChange = (productId: string, newQuantity: number, variantId?: string) => {
     if (newQuantity <= 0) {
-      removeItem(productId)
+      removeItem(productId, variantId) // Pass variantId here
       toast.success("Item removed from cart")
     } else {
-      updateQuantity(productId, newQuantity)
+      updateQuantity(productId, newQuantity, variantId) // Pass variantId here
     }
   }
 
@@ -201,7 +188,7 @@ export function Header() {
         category: product.category,
         selectedVariant: product.selectedVariant, // Pass the selected variant details
       }
-      addItem(cartProduct, 1)
+      addItem(cartProduct, 1, product.selectedVariant) // Pass selectedVariant object to addItem
       toast.success(`${getProductName(product)} added to cart!`)
     } catch (error) {
       console.error("Error adding to cart:", error)
@@ -241,19 +228,19 @@ export function Header() {
   }
 
   // Helper function to safely get product name (now considering variant)
-  const getProductName = (product: WishlistItem) => {
+  const getProductName = (product: WishlistItem | CartProduct) => {
     return product?.selectedVariant?.name
       ? `${product.name} (${product.selectedVariant.name})`
       : product?.name || "Unknown Product"
   }
 
   // Helper function to safely get product price (uses the price field which should reflect variant price)
-  const getProductPrice = (product: WishlistItem) => {
+  const getProductPrice = (product: WishlistItem | CartProduct) => {
     return product?.price || 0
   }
 
   // Helper function to safely get product thumbnail
-  const getProductThumbnail = (product: WishlistItem) => {
+  const getProductThumbnail = (product: WishlistItem | CartProduct) => {
     return product?.thumbnail || "/placeholder.svg?height=60&width=60"
   }
 
@@ -515,30 +502,39 @@ export function Header() {
                         .filter((item) => item && item.product) // Filter out invalid items
                         .map((item) => (
                           <div
-                            key={item.product._id || Math.random()}
+                            // Use a unique key that includes variant ID if present
+                            key={
+                              item.product.selectedVariant
+                                ? `${item.product._id}-${item.product.selectedVariant._id}`
+                                : item.product._id
+                            }
                             className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50"
                           >
                             <img
-                              src={item.product.thumbnail || "/placeholder.svg"}
-                              alt={item.product.name || "Product"}
+                              src={getProductThumbnail(item.product) || "/placeholder.svg"}
+                              alt={getProductName(item.product) || "Product"}
                               className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-sm text-gray-900 line-clamp-2 mb-1">
-                                {item.product.selectedVariant?.name
-                                  ? `${item.product.name} (${item.product.selectedVariant.name})`
-                                  : item.product.name || "Unknown Product"}{" "}
+                                {getProductName(item.product)}{" "}
                                 {/* Display variant name if present */}
                               </h4>
                               <p className="text-sm text-gray-600 mb-3">
-                                ₹{(item.product.price || 0).toLocaleString()}
+                                ₹{(getProductPrice(item.product) || 0).toLocaleString()}
                               </p>
                               <div className="flex items-center space-x-3">
                                 <div className="flex items-center space-x-2 border border-gray-200 rounded-lg bg-white">
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleQuantityChange(item.product._id || "", item.quantity - 1)}
+                                    onClick={() =>
+                                      handleQuantityChange(
+                                        item.product._id || "",
+                                        item.quantity - 1,
+                                        item.product.selectedVariant?._id, // Pass variantId
+                                      )
+                                    }
                                     className="h-8 w-8 p-0 hover:bg-gray-100"
                                   >
                                     <Minus className="h-3 w-3" />
@@ -547,7 +543,13 @@ export function Header() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleQuantityChange(item.product._id || "", item.quantity + 1)}
+                                    onClick={() =>
+                                      handleQuantityChange(
+                                        item.product._id || "",
+                                        item.quantity + 1,
+                                        item.product.selectedVariant?._id, // Pass variantId
+                                      )
+                                    }
                                     className="h-8 w-8 p-0 hover:bg-gray-100"
                                   >
                                     <Plus className="h-3 w-3" />
@@ -556,7 +558,9 @@ export function Header() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => removeItem(item.product._id || "")}
+                                  onClick={() =>
+                                    removeItem(item.product._id || "", item.product.selectedVariant?._id)
+                                  } {/* Pass variantId */}
                                   className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
                                 >
                                   <X className="h-4 w-4" />
@@ -565,7 +569,7 @@ export function Header() {
                             </div>
                             <div className="text-right flex-shrink-0">
                               <p className="font-semibold text-gray-900">
-                                ₹{((item.product.price || 0) * item.quantity).toLocaleString()}
+                                ₹{((getProductPrice(item.product) || 0) * item.quantity).toLocaleString()}
                               </p>
                             </div>
                           </div>
@@ -573,6 +577,7 @@ export function Header() {
                     </div>
                   )}
                 </div>
+
                 {cartState.items.length > 0 && (
                   <div className="border-t pt-4 space-y-4">
                     <div className="flex justify-between items-center">
