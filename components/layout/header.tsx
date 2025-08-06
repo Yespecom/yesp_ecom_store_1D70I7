@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet" // Added SheetDescription
 import { Search, ShoppingCart, Heart, User, Menu, X, Plus, Minus, LogOut, Package, UserCircle, Trash2 } from 'lucide-react'
 import { useCart } from "@/lib/cart-context"
 import { toast } from "sonner"
@@ -330,9 +330,9 @@ export function Header() {
                       </div>
                       <div>
                         <SheetTitle className="text-left text-lg font-bold text-gray-900">My Wishlist</SheetTitle>
-                        <p className="text-sm text-gray-600">
-                          {wishlistItems.length} {wishlistItems.length === 1 ? "item" : "items"} saved
-                        </p>
+                        <SheetDescription className="text-left text-sm text-gray-600">
+                          Items you've saved for later.
+                        </SheetDescription>
                       </div>
                     </div>
                     {wishlistItems.length > 0 && (
@@ -427,7 +427,6 @@ export function Header() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleAddToCartFromWishlist(item)}
-                                  // Removed disabled prop
                                   className="flex-1 h-9 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
                                 >
                                   <ShoppingCart className="h-3 w-3 mr-1" />
@@ -493,6 +492,9 @@ export function Header() {
                   <SheetTitle className="text-left">
                     Shopping Cart ({cartState.itemCount} {cartState.itemCount === 1 ? "item" : "items"})
                   </SheetTitle>
+                  <SheetDescription className="text-left text-sm text-gray-600">
+                    Review your items before checkout.
+                  </SheetDescription>
                 </SheetHeader>
                 <div className="flex-1 overflow-y-auto py-4">
                   {cartState.items.length === 0 ? (
@@ -697,6 +699,9 @@ export function Header() {
               <SheetContent side="left" className="w-80">
                 <SheetHeader className="border-b pb-4">
                   <SheetTitle className="text-left">Menu</SheetTitle>
+                  <SheetDescription className="text-left text-sm text-gray-600">
+                    Navigate through the store.
+                  </SheetDescription>
                 </SheetHeader>
                 <div className="py-6 space-y-6">
                   {user && (
