@@ -32,7 +32,7 @@ interface Product {
     allowBackorder: boolean
   }
   hasVariants: boolean
-  variants: any[]
+  variants: ProductVariant[] // Ensure this uses the ProductVariant interface
   weight: number
   dimensions: {
     length: number | null
@@ -57,6 +57,17 @@ interface Product {
   attributes: any[]
   createdAt: string
   updatedAt: string
+}
+
+// NEW: Define and export ProductVariant interface
+export interface ProductVariant {
+  _id: string
+  name: string // e.g., "Red, Large"
+  price: number
+  originalPrice?: number
+  stock?: number
+  // Add other variant-specific properties if needed, like color, size, etc.
+  // Example: color?: string; size?: string;
 }
 
 interface Customer {
@@ -151,7 +162,6 @@ export class ApiClient {
       "Content-Type": "application/json",
       ...options.headers,
     }
-
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`
     }
@@ -227,7 +237,7 @@ export class ApiClient {
       }
 
       return data
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 API Request Failed:", {
         error: error.message,
         url: url,
@@ -242,7 +252,6 @@ export class ApiClient {
   // 🧪 NEW: Test API connectivity
   async testApiConnectivity() {
     console.log("🧪 Testing API connectivity...")
-
     try {
       // Test 1: Basic server connectivity
       console.log("🔍 Test 1: Basic server connectivity")
@@ -258,7 +267,6 @@ export class ApiClient {
       console.log("🔍 Test 3: Payments config endpoint")
       const configResponse = await fetch(`${BASE_URL}/payments/config`)
       console.log("✅ Payments config response:", configResponse.status, configResponse.statusText)
-
       if (configResponse.ok) {
         const configData = await configResponse.text()
         console.log("📦 Config data:", configData.substring(0, 200))
@@ -268,7 +276,6 @@ export class ApiClient {
       console.log("🔍 Test 4: Payments test endpoint")
       const testResponse = await fetch(`${BASE_URL}/payments/test`)
       console.log("✅ Payments test response:", testResponse.status, testResponse.statusText)
-
       if (testResponse.ok) {
         const testData = await testResponse.text()
         console.log("📦 Test data:", testData.substring(0, 200))
@@ -283,7 +290,7 @@ export class ApiClient {
           paymentsTest: testResponse.status,
         },
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ API connectivity test failed:", error)
       return {
         success: false,
@@ -302,7 +309,6 @@ export class ApiClient {
 
       // Use the simple config endpoint - no authentication required
       const response = await fetch(`${BASE_URL}/payments/config`)
-
       console.log("💳 Config response status:", response.status, response.statusText)
       console.log("💳 Config response headers:", Object.fromEntries(response.headers.entries()))
 
@@ -318,7 +324,7 @@ export class ApiClient {
         success: true,
         data: data,
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Failed to get Razorpay config:", error)
       // Return default fallback config
       return {
@@ -370,7 +376,6 @@ export class ApiClient {
   }): Promise<ApiResponse<RazorpayOrderResponse>> {
     console.log("💳 Step 1: Initiating Razorpay payment...")
     console.log("💳 Order data:", JSON.stringify(orderData, null, 2))
-
     try {
       // First test if the endpoint exists
       console.log("🧪 Testing payments/initiate endpoint availability...")
@@ -381,12 +386,10 @@ export class ApiClient {
         method: "POST",
         body: JSON.stringify(orderData),
       })
-
       console.log("✅ Razorpay payment initiated:", response)
       return response
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Failed to initiate Razorpay payment:", error)
-
       // Additional debugging
       if (error.name === "APIError_404") {
         console.error("🔍 404 Error - Route not found. Checking available routes...")
@@ -401,7 +404,6 @@ export class ApiClient {
           console.error("❌ Even test endpoint failed:", testError)
         }
       }
-
       throw error
     }
   }
@@ -430,7 +432,6 @@ export class ApiClient {
     razorpaySignature?: string
   }) {
     console.log("📦 Step 4: Creating order after payment verification...")
-
     // Set payment status based on payment method
     const paymentStatus = orderData.paymentMethod === "online" ? "paid" : "pending"
 
@@ -465,7 +466,6 @@ export class ApiClient {
           message: response.message || "Order created successfully",
         }
       }
-
       if (response.order) {
         return {
           success: true,
@@ -473,7 +473,6 @@ export class ApiClient {
           message: response.message || "Order created successfully",
         }
       }
-
       if (response.message && response.orderNumber) {
         return {
           success: true,
@@ -488,7 +487,7 @@ export class ApiClient {
         order: response,
         message: "Order created successfully",
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Order creation failed after payment:", error)
       throw error
     }
@@ -535,7 +534,6 @@ export class ApiClient {
         this.setToken(token)
         console.log("✅ Token set successfully")
       }
-
       if (userData) {
         localStorage.setItem("user_data", JSON.stringify(userData))
         console.log("✅ User data stored successfully")
@@ -550,7 +548,7 @@ export class ApiClient {
         },
         message: response.message || "Login successful",
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 Login failed:", error)
       throw error
     }
@@ -570,7 +568,6 @@ export class ApiClient {
       phone: data.phone,
       acceptTerms: true,
     }
-
     console.log("🔐 API: Sending registration request with data:", requestData)
 
     try {
@@ -578,7 +575,6 @@ export class ApiClient {
         method: "POST",
         body: JSON.stringify(requestData),
       })
-
       console.log("📋 API: Raw registration response:", response)
 
       // Handle the token if present at root level
@@ -643,7 +639,7 @@ export class ApiClient {
           response.message ||
           `Registration failed - userData: ${!!userData}, token: ${!!token}. Response: ${JSON.stringify(response)}`,
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 API: Registration request failed:", error)
       throw error
     }
@@ -655,7 +651,6 @@ export class ApiClient {
     } catch (error) {
       console.log("Logout API call failed, but continuing with local cleanup")
     }
-
     this.token = null
     this.requestCache.clear()
     localStorage.removeItem("auth_token")
@@ -747,7 +742,7 @@ export class ApiClient {
           currentPage,
         },
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 Products fetch failed:", error)
       throw error
     }
@@ -794,7 +789,7 @@ export class ApiClient {
         console.log(`❌ No product found with slug "${slug}"`)
         throw new Error("Product not found")
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 Product by slug fetch failed:", error)
       // Fallback to trying the slug as an ID
       console.log("🔄 Trying slug as product ID...")
@@ -826,7 +821,7 @@ export class ApiClient {
         success: true,
         data: products,
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 Featured products fetch failed:", error)
       throw error
     }
@@ -841,7 +836,6 @@ export class ApiClient {
         }
       })
     }
-
     console.log("🔎 Searching products:", query, filters)
     return this.request<{
       products: Product[]
@@ -889,7 +883,6 @@ export class ApiClient {
         }
       })
     }
-
     console.log("📦 Fetching orders with params:", params)
     return this.request<{
       orders: Order[]
@@ -914,7 +907,6 @@ export class ApiClient {
     const params = new URLSearchParams()
     if (type) params.append("type", type)
     if (active !== undefined) params.append("active", active.toString())
-
     console.log("🎁 Fetching offers:", { type, active })
     return this.request(`/offers?${params.toString()}`)
   }
@@ -988,7 +980,6 @@ export class ApiClient {
         }
       })
     }
-
     console.log("⭐ Fetching product reviews:", productId)
     return this.request(`/products/${productId}/reviews?${queryParams.toString()}`)
   }
@@ -1075,4 +1066,4 @@ export class ApiClient {
 
 export const apiClient = new ApiClient()
 export const api = apiClient // For backward compatibility
-export type { Product, Customer, Order, RazorpayOrderResponse }
+export type { Product, Customer, Order, RazorpayOrderResponse, ProductVariant } // Export ProductVariant
