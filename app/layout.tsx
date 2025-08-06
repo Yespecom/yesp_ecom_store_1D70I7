@@ -1,10 +1,11 @@
-import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import "./globals.css"
-import { CartProvider } from "@/lib/cart-context"
-import { WishlistProvider } from "@/lib/wishlist-context"
-import { Toaster } from "@/components/ui/sonner"
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+import { CartProvider } from '@/lib/cart-context'
+import { WishlistProvider } from '@/lib/wishlist-context'
+import { Toaster } from '@/components/ui/sonner'
+import { Header } from '@/components/layout/header' // Ensure Header is imported
+import { useEffect } from 'react' // Import useEffect for error handling
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -123,6 +124,24 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Add useEffect hook to handle ChunkLoadError
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      // Check if the error is a ChunkLoadError
+      if (event.message && event.message.includes('ChunkLoadError')) {
+        console.error('ChunkLoadError detected, forcing page reload:', event);
+        // Force a hard reload to clear stale chunks
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('error', handleError);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+    };
+  }, []);
+
   return (
     <html lang="en">
       <head>
@@ -130,7 +149,6 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-
         {/* Structured Data - JSON-LD */}
         <script
           type="application/ld+json"
@@ -166,6 +184,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <CartProvider>
           <WishlistProvider>
+            <Header /> {/* Header component re-added here */}
             {children}
             <Toaster />
           </WishlistProvider>
