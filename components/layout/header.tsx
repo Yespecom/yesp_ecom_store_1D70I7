@@ -427,11 +427,11 @@ export function Header() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleAddToCartFromWishlist(item)}
-                                  disabled={getProductStock(item) === 0}
-                                  className="flex-1 h-9 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  // Removed disabled prop
+                                  className="flex-1 h-9 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
                                 >
                                   <ShoppingCart className="h-3 w-3 mr-1" />
-                                  {getProductStock(item) === 0 ? "Unavailable" : "Add to Cart"}
+                                  Add to Cart {/* Always show "Add to Cart" */}
                                 </Button>
                                 <Button
                                   variant="ghost"
