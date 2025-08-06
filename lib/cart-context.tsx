@@ -161,7 +161,7 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, initialState) // [^2]
+  const [state, dispatch] = useReducer(cartReducer, initialState)
 
   // Load cart from localStorage on mount
   useEffect(() => {
