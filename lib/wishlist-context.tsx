@@ -1,8 +1,8 @@
 "use client"
-
 import type React from "react"
 import { createContext, useContext, useReducer, useEffect, useCallback } from "react"
 import type { Product as ApiProduct, ProductVariant as ApiProductVariant } from "./api" // Assuming these types are defined in your lib/api.ts
+import { toast } from "sonner" // Ensure toast is imported if used for notifications
 
 // Extend Product type for wishlist items to include selected variant details
 interface WishlistItem extends ApiProduct {
@@ -27,17 +27,13 @@ const wishlistReducer = (state: WishlistState, action: WishlistAction): Wishlist
   switch (action.type) {
     case "TOGGLE_ITEM": {
       const { product, selectedVariant } = action.payload
-
       // Determine the unique identifier for the item (product ID + variant ID if applicable)
       const itemId = selectedVariant ? `${product._id}-${selectedVariant._id}` : product._id
-
       const existingItemIndex = state.items.findIndex((item) => {
         const existingItemId = item.selectedVariant ? `${item._id}-${item.selectedVariant._id}` : item._id
         return existingItemId === itemId
       })
-
       let updatedItems: WishlistItem[]
-
       if (existingItemIndex > -1) {
         // Item exists, remove it
         updatedItems = state.items.filter((item, index) => index !== existingItemIndex)
@@ -47,7 +43,6 @@ const wishlistReducer = (state: WishlistState, action: WishlistAction): Wishlist
         const itemPrice = selectedVariant?.price ?? product.price
         const itemOriginalPrice = selectedVariant?.originalPrice ?? product.originalPrice
         const itemStock = selectedVariant?.stock ?? product.stock
-
         const wishlistItem: WishlistItem = {
           ...product,
           price: itemPrice, // Use variant price
