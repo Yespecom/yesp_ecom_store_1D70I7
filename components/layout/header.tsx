@@ -179,12 +179,12 @@ export function Header() {
       const cartProduct: CartProduct = {
         _id: product._id,
         name: product.name,
-        price: product.price, // This should already be the variant price if selected
+        price: getProductPrice(product), // Use the helper to get the correct price
         thumbnail: product.thumbnail,
         slug: product.slug,
         description: product.description,
         shortDescription: product.shortDescription,
-        stock: product.stock, // This should already be the variant stock if selected
+        stock: getProductStock(product), // Use the helper to get the correct stock
         category: product.category,
         selectedVariant: product.selectedVariant, // Pass the selected variant details
       }
@@ -234,9 +234,19 @@ export function Header() {
       : product?.name || "Unknown Product"
   }
 
-  // Helper function to safely get product price (uses the price field which should reflect variant price)
+  // Helper function to safely get product price (prioritizes variant price)
   const getProductPrice = (product: WishlistItem | CartProduct) => {
-    return product?.price || 0
+    return product?.selectedVariant?.price ?? product?.price ?? 0
+  }
+
+  // Helper function to safely get product original price (prioritizes variant original price)
+  const getProductOriginalPrice = (product: WishlistItem | CartProduct) => {
+    return product?.selectedVariant?.originalPrice ?? product?.originalPrice
+  }
+
+  // Helper function to safely get product stock (prioritizes variant stock)
+  const getProductStock = (product: WishlistItem | CartProduct) => {
+    return product?.selectedVariant?.stock ?? product?.stock ?? 0
   }
 
   // Helper function to safely get product thumbnail
@@ -404,9 +414,9 @@ export function Header() {
                                   <p className="text-lg font-bold text-gray-900">
                                     ₹{getProductPrice(item).toLocaleString()}
                                   </p>
-                                  {item.originalPrice && item.originalPrice > item.price && (
+                                  {getProductOriginalPrice(item) && getProductOriginalPrice(item)! > getProductPrice(item) && (
                                     <p className="text-sm text-gray-500 line-through">
-                                      ₹{item.originalPrice.toLocaleString()}
+                                      ₹{getProductOriginalPrice(item)!.toLocaleString()}
                                     </p>
                                   )}
                                 </div>
@@ -417,11 +427,11 @@ export function Header() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleAddToCartFromWishlist(item)}
-                                  disabled={item.stock === 0}
+                                  disabled={getProductStock(item) === 0}
                                   className="flex-1 h-9 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   <ShoppingCart className="h-3 w-3 mr-1" />
-                                  {item.stock === 0 ? "Out of Stock" : "Add to Cart"}
+                                  {getProductStock(item) === 0 ? "Unavailable" : "Add to Cart"}
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -450,7 +460,7 @@ export function Header() {
                         <span className="font-medium">{wishlistItems.length}</span> items in wishlist
                       </div>
                       <div className="text-xs text-gray-500">
-                        Total value: ₹{wishlistItems.reduce((total, item) => total + item.price, 0).toLocaleString()}
+                        Total value: ₹{wishlistItems.reduce((total, item) => total + getProductPrice(item), 0).toLocaleString()}
                       </div>
                     </div>
                     <Button
@@ -501,8 +511,6 @@ export function Header() {
                       {cartState.items
                         .filter((item) => item && item.product) // Filter out invalid items
                         .map((item) => {
-                          // Add this log to inspect the item object
-                          console.log("Header Cart Item in render:", item);
                           return (
                             <div
                               // Use a unique key that includes variant ID if present
