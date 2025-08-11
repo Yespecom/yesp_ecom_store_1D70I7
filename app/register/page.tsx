@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -11,166 +11,87 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { apiClient } from "@/lib/api"
-import { ArrowLeft, Phone, User, ShieldCheck, Timer, RotateCw } from "lucide-react"
-import { ensureFirebaseApp } from "@/lib/firebase-client"
-import type { ConfirmationResult } from "firebase/auth"
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"
+import { Eye, EyeOff, ArrowLeft, Mail, Lock, User, Phone } from "lucide-react"
 
 export default function RegisterPage() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    phone: "",
+    acceptTerms: false,
+    rememberMe: false,
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [step, setStep] = useState(1)
   const router = useRouter()
 
-  const [name, setName] = useState("")
-  const [phone, setPhone] = useState("")
-  const [otp, setOtp] = useState("")
-  const [acceptTerms, setAcceptTerms] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
-
-  const [step, setStep] = useState<1 | 2>(1)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string>("")
-  const [info, setInfo] = useState<string>("")
-
-  const [provider, setProvider] = useState<"firebase" | "sms" | null>(null)
-  const confirmationResultRef = useRef<ConfirmationResult | null>(null)
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null)
-  const [resendIn, setResendIn] = useState<number>(0)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
-
-  const canSend = useMemo(() => {
-    return name.trim().length >= 2 && /^\+?[1-9]\d{7,14}$/.test(phone.trim())
-  }, [name, phone])
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
-  }, [])
-
-  const startResendCountdown = () => {
-    setResendIn(60)
-    if (timerRef.current) clearInterval(timerRef.current)
-    timerRef.current = setInterval(() => {
-      setResendIn((prev) => {
-        if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-  }
-
-  const setupRecaptcha = (auth: any) => {
-    if (recaptchaRef.current) return recaptchaRef.current
-    recaptchaRef.current = new RecaptchaVerifier(
-      "recaptcha-container-register",
-      {
-        size: "invisible",
-      },
-      auth,
-    )
-    return recaptchaRef.current
-  }
-
-  const sendOtp = async () => {
-    if (!acceptTerms) {
-      setError("Please accept the terms and conditions")
-      return
-    }
-    setLoading(true)
-    setError("")
-    setInfo("")
-    try {
-      const res: any = await apiClient.requestOtp(phone.trim(), "registration")
-
-      const providerResp = res?.provider || res?.data?.provider || "firebase"
-      setProvider(providerResp)
-
-      if (providerResp === "firebase") {
-        const config = res?.config || res?.data?.config
-        if (!config) {
-          throw new Error("Missing Firebase config from server")
-        }
-        const { auth } = ensureFirebaseApp(config)
-        const verifier = setupRecaptcha(auth)
-        const confirmation = await signInWithPhoneNumber(auth, phone.trim(), verifier)
-        confirmationResultRef.current = confirmation
-        setStep(2)
-        setInfo("OTP sent. Please check your phone.")
-        startResendCountdown()
-      } else {
-        // Fallback SMS flow
-        setStep(2)
-        setInfo("OTP sent via SMS. Please enter it below.")
-        startResendCountdown()
-      }
-    } catch (err: any) {
-      console.error("Send OTP error:", err)
-      setError(err?.message || "Failed to send OTP")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const verifyOtp = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
-    setInfo("")
-    try {
-      if (provider === "firebase") {
-        const confirmation = confirmationResultRef.current
-        if (!confirmation) {
-          throw new Error("OTP session expired. Please resend OTP.")
-        }
-        const cred = await confirmation.confirm(otp.trim())
-        const idToken = await cred.user.getIdToken()
-        const result: any = await apiClient.verifyFirebaseOtp({
-          idToken,
-          name: name.trim(),
-          rememberMe,
-        })
 
-        if (result?.success !== false) {
-          // Store a simple header-friendly name if not present
-          const headerUser = {
-            name: result?.customer?.name || name.trim(),
-            phone: phone.trim(),
-            email: result?.customer?.email || "",
-          }
-          localStorage.setItem("user_data", JSON.stringify(headerUser))
-          window.dispatchEvent(new Event("storage"))
-          router.push("/?welcome=true")
-          return
+    if (!formData.acceptTerms) {
+      setError("Please accept the terms and conditions")
+      setLoading(false)
+      return
+    }
+
+    try {
+      // Split the name into firstName and lastName for the API
+      const nameParts = formData.name.trim().split(" ")
+      const firstName = nameParts[0] || formData.name
+      const lastName = nameParts.slice(1).join(" ") || ""
+
+      const response = await apiClient.register({
+        firstName: firstName,
+        lastName: lastName,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+      })
+
+      if (response.success && response.data) {
+        // Store user data for immediate header update
+        const userData = {
+          name: formData.name, // Use the full name from form
+          email: formData.email,
+          phone: formData.phone,
         }
-        throw new Error(result?.message || "Registration failed")
+        localStorage.setItem("user_data", JSON.stringify(userData))
+
+        // Trigger storage event for header update
+        window.dispatchEvent(new Event("storage"))
+
+        // Redirect to home page
+        router.push("/?welcome=true")
       } else {
-        // Fallback SMS verification
-        const result: any = await apiClient.verifySmsOtp({
-          phone: phone.trim(),
-          otp: otp.trim(),
-          purpose: "registration",
-          name: name.trim(),
-          rememberMe,
-        })
-        if (result?.success !== false) {
-          window.dispatchEvent(new Event("storage"))
-          router.push("/?welcome=true")
-          return
-        }
-        throw new Error(result?.message || "Registration failed")
+        setError(response.message || "Registration failed")
       }
-    } catch (err: any) {
-      console.error("Verify OTP error:", err)
-      setError(err?.message || "Invalid OTP. Please try again.")
+    } catch (error: any) {
+      console.error("Registration error:", error)
+      setError(error.message || "Registration failed")
     } finally {
       setLoading(false)
     }
   }
 
-  const resend = async () => {
-    if (resendIn > 0 || loading) return
-    await sendOtp()
+  const nextStep = () => {
+    if (step === 1) {
+      if (!formData.name || !formData.email) {
+        setError("Please fill in all required fields")
+        return
+      }
+      setError("")
+      setStep(2)
+    }
+  }
+
+  const prevStep = () => {
+    setError("")
+    setStep(step - 1)
   }
 
   return (
@@ -188,7 +109,7 @@ export default function RegisterPage() {
           <div className="max-w-md text-center">
             <h1 className="text-4xl font-bold mb-6">Join oneofwun</h1>
             <p className="text-lg text-gray-200 mb-8">
-              Create your account with your phone and discover premium fashion that defines your unique style.
+              Create your account and discover premium fashion that defines your unique style.
             </p>
             <div className="space-y-4 text-left">
               <div className="flex items-center space-x-3">
@@ -212,7 +133,7 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* Right Side - Phone OTP Registration */}
+      {/* Right Side - Registration Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Back to Home */}
@@ -236,7 +157,7 @@ export default function RegisterPage() {
 
               <CardTitle className="text-2xl font-bold text-gray-900">Create Account</CardTitle>
               <CardDescription className="text-gray-600">
-                {step === 1 ? "Let’s start with your details" : "We’ve sent an OTP to your phone"}
+                {step === 1 ? "Let's start with your basic information" : "Complete your account setup"}
               </CardDescription>
 
               {/* Progress Indicator */}
@@ -247,167 +168,232 @@ export default function RegisterPage() {
             </CardHeader>
 
             <CardContent className="space-y-6">
-              {/* Alerts */}
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">{error}</div>
-              )}
-              {info && (
-                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm">
-                  {info}
-                </div>
-              )}
-
-              {step === 1 && (
-                <div className="space-y-6">
-                  {/* Name */}
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                      Full Name
-                    </Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        id="name"
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
-                        placeholder="Enter your full name"
-                      />
-                    </div>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm flex items-center">
+                    <div className="w-2 h-2 bg-red-500 rounded-full mr-3"></div>
+                    {error}
                   </div>
+                )}
 
-                  {/* Phone */}
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
-                      Phone Number
-                    </Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        id="phone"
-                        type="tel"
-                        inputMode="tel"
-                        placeholder="+1 555 123 4567"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      We&apos;ll send an OTP to verify your number.
-                    </p>
-                  </div>
-
-                  {/* Terms and Remember */}
-                  <div className="space-y-4">
-                    <div className="flex items-start space-x-3">
-                      <Checkbox
-                        id="terms"
-                        checked={acceptTerms}
-                        onCheckedChange={(checked) => setAcceptTerms(!!checked)}
-                        className="mt-1 rounded border-gray-300"
-                      />
-                      <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
-                        I agree to the{" "}
-                        <Link href="/terms" className="text-black hover:underline font-medium">
-                          Terms of Service
-                        </Link>{" "}
-                        and{" "}
-                        <Link href="/privacy" className="text-black hover:underline font-medium">
-                          Privacy Policy
-                        </Link>
+                {step === 1 && (
+                  <>
+                    {/* Name Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                        Full Name
                       </Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          id="name"
+                          type="text"
+                          required
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                          placeholder="Enter your full name"
+                        />
+                      </div>
                     </div>
 
-                    <div className="flex items-center space-x-3">
-                      <Checkbox
-                        id="remember"
-                        checked={rememberMe}
-                        onCheckedChange={(checked) => setRememberMe(!!checked)}
-                        className="rounded border-gray-300"
-                      />
-                      <Label htmlFor="remember" className="text-sm text-gray-600">
-                        Keep me signed in
+                    {/* Email Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                        Email Address
                       </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          id="email"
+                          type="email"
+                          required
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                          placeholder="Enter your email"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <Button
-                    type="button"
-                    onClick={sendOtp}
-                    disabled={!canSend || loading}
-                    className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                  >
-                    {loading ? "Sending OTP..." : "Continue"}
-                  </Button>
+                    {/* Next Button */}
+                    <Button
+                      type="button"
+                      onClick={nextStep}
+                      className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                    >
+                      Continue
+                    </Button>
+                  </>
+                )}
 
-                  <div id="recaptcha-container-register" className="hidden" aria-hidden="true" />
-                </div>
-              )}
+                {step === 2 && (
+                  <>
+                    {/* Phone Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
+                        Phone Number
+                      </Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          id="phone"
+                          type="tel"
+                          required
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                          placeholder="Enter your phone number"
+                        />
+                      </div>
+                    </div>
 
-              {step === 2 && (
-                <form onSubmit={verifyOtp} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
-                      Enter OTP
-                    </Label>
-                    <div className="flex gap-3">
-                      <Input
-                        id="otp"
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="6-digit code"
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value)}
-                        className="h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
-                      />
+                    {/* Password Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                        Password
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          required
+                          value={formData.password}
+                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                          className="pl-10 pr-12 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                          placeholder="Create a strong password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Password should be at least 8 characters with letters and numbers
+                      </p>
+                    </div>
+
+                    {/* Terms and Conditions */}
+                    <div className="space-y-4">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox
+                          id="terms"
+                          checked={formData.acceptTerms}
+                          onCheckedChange={(checked) => setFormData({ ...formData, acceptTerms: checked as boolean })}
+                          className="mt-1 rounded border-gray-300"
+                        />
+                        <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
+                          I agree to the{" "}
+                          <Link href="/terms" className="text-black hover:underline font-medium">
+                            Terms of Service
+                          </Link>{" "}
+                          and{" "}
+                          <Link href="/privacy" className="text-black hover:underline font-medium">
+                            Privacy Policy
+                          </Link>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-3">
+                        <Checkbox
+                          id="remember"
+                          checked={formData.rememberMe}
+                          onCheckedChange={(checked) => setFormData({ ...formData, rememberMe: checked as boolean })}
+                          className="rounded border-gray-300"
+                        />
+                        <Label htmlFor="remember" className="text-sm text-gray-600">
+                          Keep me signed in
+                        </Label>
+                      </div>
+                    </div>
+
+                    {/* Navigation Buttons */}
+                    <div className="flex space-x-4">
+                      <Button
+                        type="button"
+                        onClick={prevStep}
+                        variant="outline"
+                        className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
+                      >
+                        Back
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="flex-1 h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <div className="flex items-center">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                            Creating Account...
+                          </div>
+                        ) : (
+                          "Create Account"
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {step === 2 && (
+                  <>
+                    {/* Divider */}
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-200"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-4 bg-white text-gray-500">or sign up with</span>
+                      </div>
+                    </div>
+
+                    {/* Social Login Buttons */}
+                    <div className="grid grid-cols-2 gap-4">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={resend}
-                        disabled={resendIn > 0 || loading}
-                        className="h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent min-w-[120px]"
-                        title={resendIn > 0 ? `Resend in ${resendIn}s` : "Resend OTP"}
+                        className="h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
+                        disabled={loading}
                       >
-                        <RotateCw className="h-4 w-4 mr-2" />
-                        {resendIn > 0 ? `${resendIn}s` : "Resend"}
+                        <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                          <path
+                            fill="currentColor"
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                          />
+                          <path
+                            fill="currentColor"
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                          />
+                          <path
+                            fill="currentColor"
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                          />
+                          <path
+                            fill="currentColor"
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                          />
+                        </svg>
+                        Google
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
+                        disabled={loading}
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                        </svg>
+                        Facebook
                       </Button>
                     </div>
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
-                      <Timer className="h-3.5 w-3.5" />
-                      Code expires in 10 minutes
-                    </p>
-                  </div>
-
-                  <div className="flex space-x-4">
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        setStep(1)
-                        setOtp("")
-                        setInfo("")
-                        setError("")
-                      }}
-                      variant="outline"
-                      className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={otp.trim().length < 4 || loading}
-                      className="flex-1 h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                    >
-                      {loading ? "Verifying..." : "Create Account"}
-                    </Button>
-                  </div>
-
-                  <div id="recaptcha-container-register" className="hidden" aria-hidden="true" />
-                </form>
-              )}
+                  </>
+                )}
+              </form>
 
               {/* Sign In Link */}
               <div className="text-center pt-6 border-t border-gray-100">

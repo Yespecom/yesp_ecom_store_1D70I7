@@ -657,15 +657,6 @@ export class ApiClient {
     localStorage.removeItem("user_data")
   }
 
-  public setAuthToken(token: string) {
-    this.token = token
-    localStorage.setItem("auth_token", token)
-  }
-
-  public setUserData(user: any) {
-    localStorage.setItem("user_data", JSON.stringify(user))
-  }
-
   // Product methods with better error handling and caching
   async getProducts(params?: {
     category?: string
