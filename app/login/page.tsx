@@ -23,7 +23,6 @@ export default function LoginPage() {
   const [devCode, setDevCode] = useState<string>("")
   const [cooldown, setCooldown] = useState<number>(0)
 
-  // cooldown timer
   useEffect(() => {
     if (cooldown <= 0) return
     const t = setInterval(() => setCooldown((c) => (c > 0 ? c - 1 : 0)), 1000)
@@ -44,16 +43,14 @@ export default function LoginPage() {
     try {
       const res = await requestPhoneOtp({ phone, purpose: "login", channel: "sms" })
       setInfo(res.message || "OTP sent")
-      if (res.dev?.code) {
-        setDevCode(res.dev.code)
-      }
+      if (res.dev?.code) setDevCode(res.dev.code)
       setStep(2)
-      setCooldown(60) // UI cooldown for resend
+      setCooldown(60)
     } catch (e: any) {
       const code = e?.code
       if (code === "OTP_RATE_LIMIT_EXCEEDED") {
-        setCooldown(600) // 10 minutes as per rate limits
-        setError("Too many requests. Please retry after 10 minutes.")
+        setCooldown(e?.retryAfter ? Number(e.retryAfter) : 600)
+        setError("Too many requests. Please retry later.")
       } else {
         setError(e?.message || "Failed to send OTP")
       }
@@ -72,10 +69,8 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await verifyPhoneOtp({ phone, otp, purpose: "login", rememberMe })
-      // Save token and user, and sync ApiClient instance
       apiClient.setAuthToken(res.token)
       apiClient.setUserData(res.customer)
-      // Trigger storage event for header update
       window.dispatchEvent(new Event("storage"))
       router.push("/?welcome=true")
     } catch (e: any) {
@@ -85,8 +80,8 @@ export default function LoginPage() {
       } else if (code === "INVALID_OTP") {
         setError("Invalid OTP. Please try again.")
       } else if (code === "OTP_RATE_LIMIT_EXCEEDED") {
-        setCooldown(600)
-        setError("Too many attempts. Please retry after 10 minutes.")
+        setCooldown(e?.retryAfter ? Number(e.retryAfter) : 600)
+        setError("Too many attempts. Please retry later.")
       } else {
         setError(e?.message || "Verification failed. Try again.")
       }
