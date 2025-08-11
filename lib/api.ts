@@ -145,18 +145,22 @@ export class ApiClient {
       const cached = this.requestCache.get(cacheKey)
       if (Date.now() - cached.timestamp < 30000) {
         // 30 second cache
-        console.log("🔄 Using cached response for:", url)
+        if (process.env.NODE_ENV === "development") {
+          console.log("🔄 Using cached response for:", url)
+        }
         return cached.data
       }
     }
 
-    console.log("🔍 API Request:", {
-      url,
-      method: options.method || "GET",
-      headers: options.headers,
-      hasBody: !!options.body,
-      bodyLength: options.body ? JSON.stringify(options.body).length : 0,
-    })
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔍 API Request:", {
+        url,
+        method: options.method || "GET",
+        headers: options.headers,
+        hasBody: !!options.body,
+        bodyLength: options.body ? JSON.stringify(options.body).length : 0,
+      })
+    }
 
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -172,30 +176,39 @@ export class ApiClient {
         headers,
       })
 
-      console.log("📡 API Response Status:", response.status, response.statusText)
-      console.log("📡 API Response Headers:", Object.fromEntries(response.headers.entries()))
+      if (process.env.NODE_ENV === "development") {
+        console.log("📡 API Response Status:", response.status, response.statusText)
+        console.log("📡 API Response Headers:", Object.fromEntries(response.headers.entries()))
+      }
 
       let data
       const responseText = await response.text()
-      console.log("📦 Raw API Response:", responseText.substring(0, 500) + (responseText.length > 500 ? "..." : ""))
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("📦 Raw API Response:", responseText.substring(0, 500) + (responseText.length > 500 ? "..." : ""))
+      }
 
       try {
         data = responseText ? JSON.parse(responseText) : {}
       } catch (parseError) {
-        console.error("Failed to parse JSON response:", parseError)
+        if (process.env.NODE_ENV === "development") {
+          console.error("Failed to parse JSON response:", parseError)
+        }
         data = { message: responseText || "Invalid JSON response" }
       }
 
       if (!response.ok) {
-        console.error("❌ API Error:", {
-          status: response.status,
-          statusText: response.statusText,
-          data: data,
-          url: url,
-          method: options.method || "GET",
-          requestHeaders: headers,
-          responseHeaders: Object.fromEntries(response.headers.entries()),
-        })
+        if (process.env.NODE_ENV === "development") {
+          console.error("❌ API Error:", {
+            status: response.status,
+            statusText: response.statusText,
+            data: data,
+            url: url,
+            method: options.method || "GET",
+            requestHeaders: headers,
+            responseHeaders: Object.fromEntries(response.headers.entries()),
+          })
+        }
 
         const errorMessage =
           data?.message || data?.error || responseText || `API request failed with status ${response.status}`
@@ -210,22 +223,19 @@ export class ApiClient {
           this.token = null
           localStorage.removeItem("auth_token")
           localStorage.removeItem("user_data")
-          throw new Error("Access denied. Please login.")
+
+          return {
+            success: false,
+            message: "Access denied. Please login.",
+            data: null as T,
+          }
         }
 
-        // Create a more detailed error for debugging
-        const detailedError = new Error(errorMessage)
-        detailedError.name = `APIError_${response.status}`
-        detailedError.cause = {
-          status: response.status,
-          statusText: response.statusText,
-          url: url,
-          method: options.method || "GET",
-          responseData: data,
-          requestHeaders: headers,
-          responseHeaders: Object.fromEntries(response.headers.entries()),
+        return {
+          success: false,
+          message: errorMessage,
+          data: null as T,
         }
-        throw detailedError
       }
 
       // Cache successful GET requests
@@ -238,14 +248,15 @@ export class ApiClient {
 
       return data
     } catch (error: any) {
-      console.error("💥 API Request Failed:", {
-        error: error.message,
-        url: url,
-        method: options.method || "GET",
-        cause: error.cause,
-        stack: error.stack,
-      })
-      throw error
+      if (process.env.NODE_ENV === "development") {
+        console.log("🔄 API unavailable, returning error response:", url)
+      }
+
+      return {
+        success: false,
+        message: error.message || "Network error occurred",
+        data: null as T,
+      }
     }
   }
 
