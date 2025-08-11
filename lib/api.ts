@@ -1,4 +1,4 @@
-const BASE_URL = "/api/proxy"
+const BASE_URL = "https://api.yespstudio.com/api/1D70I7"
 
 interface ApiResponse<T> {
   success: boolean
@@ -255,7 +255,7 @@ export class ApiClient {
     try {
       // Test 1: Basic server connectivity
       console.log("🔍 Test 1: Basic server connectivity")
-      const basicResponse = await fetch(`${BASE_URL.replace("/api/proxy", "")}/`)
+      const basicResponse = await fetch(`${BASE_URL.replace("/api/1D70I7", "")}/`)
       console.log("✅ Basic server response:", basicResponse.status, basicResponse.statusText)
 
       // Test 2: Store-specific endpoint
@@ -377,9 +377,10 @@ export class ApiClient {
     console.log("💳 Step 1: Initiating Razorpay payment...")
     console.log("💳 Order data:", JSON.stringify(orderData, null, 2))
     try {
-      // First test connectivity
-      const connectivityTest = await this.testApiConnectivity()
-      console.log("🧪 Connectivity test results:", connectivityTest)
+      // First test if the endpoint exists
+      console.log("🧪 Testing payments/initiate endpoint availability...")
+      const testResponse = await fetch(`${BASE_URL}/payments/test`)
+      console.log("🧪 Payments test endpoint status:", testResponse.status)
 
       const response = await this.request<RazorpayOrderResponse>("/payments/initiate", {
         method: "POST",
