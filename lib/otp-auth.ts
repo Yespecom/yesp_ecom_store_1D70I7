@@ -1,6 +1,6 @@
 const OTP_DOMAIN = "https://api.yespstudio.com"
 export const STORE_ID = "1D70I7"
-const OTP_BASE = `${OTP_DOMAIN}/api/store/${STORE_ID}/auth/otp`
+const OTP_BASE = `${OTP_DOMAIN}/api/${STORE_ID}/auth/otp`
 
 export type OtpPurpose = "login" | "registration"
 export type OtpChannel = "sms" | "call"
