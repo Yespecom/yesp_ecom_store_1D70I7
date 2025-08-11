@@ -37,7 +37,7 @@ export default function RegisterPage() {
     setInfo("")
     setDevCode("")
     if (!isValidE164Phone(phone)) {
-      setError("Enter a valid phone in E.164 format, e.g., +14155552671 or +911234567890")
+      setError("Enter a valid phone e.g., +919234567890")
       return
     }
     setLoading(true)
