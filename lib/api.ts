@@ -145,22 +145,18 @@ export class ApiClient {
       const cached = this.requestCache.get(cacheKey)
       if (Date.now() - cached.timestamp < 30000) {
         // 30 second cache
-        if (process.env.NODE_ENV === "development") {
-          console.log("🔄 Using cached response for:", url)
-        }
+        console.log("🔄 Using cached response for:", url)
         return cached.data
       }
     }
 
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 API Request:", {
-        url,
-        method: options.method || "GET",
-        headers: options.headers,
-        hasBody: !!options.body,
-        bodyLength: options.body ? JSON.stringify(options.body).length : 0,
-      })
-    }
+    console.log("🔍 API Request:", {
+      url,
+      method: options.method || "GET",
+      headers: options.headers,
+      hasBody: !!options.body,
+      bodyLength: options.body ? JSON.stringify(options.body).length : 0,
+    })
 
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -176,39 +172,30 @@ export class ApiClient {
         headers,
       })
 
-      if (process.env.NODE_ENV === "development") {
-        console.log("📡 API Response Status:", response.status, response.statusText)
-        console.log("📡 API Response Headers:", Object.fromEntries(response.headers.entries()))
-      }
+      console.log("📡 API Response Status:", response.status, response.statusText)
+      console.log("📡 API Response Headers:", Object.fromEntries(response.headers.entries()))
 
       let data
       const responseText = await response.text()
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("📦 Raw API Response:", responseText.substring(0, 500) + (responseText.length > 500 ? "..." : ""))
-      }
+      console.log("📦 Raw API Response:", responseText.substring(0, 500) + (responseText.length > 500 ? "..." : ""))
 
       try {
         data = responseText ? JSON.parse(responseText) : {}
       } catch (parseError) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Failed to parse JSON response:", parseError)
-        }
+        console.error("Failed to parse JSON response:", parseError)
         data = { message: responseText || "Invalid JSON response" }
       }
 
       if (!response.ok) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("❌ API Error:", {
-            status: response.status,
-            statusText: response.statusText,
-            data: data,
-            url: url,
-            method: options.method || "GET",
-            requestHeaders: headers,
-            responseHeaders: Object.fromEntries(response.headers.entries()),
-          })
-        }
+        console.error("❌ API Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          data: data,
+          url: url,
+          method: options.method || "GET",
+          requestHeaders: headers,
+          responseHeaders: Object.fromEntries(response.headers.entries()),
+        })
 
         const errorMessage =
           data?.message || data?.error || responseText || `API request failed with status ${response.status}`
@@ -223,19 +210,22 @@ export class ApiClient {
           this.token = null
           localStorage.removeItem("auth_token")
           localStorage.removeItem("user_data")
-
-          return {
-            success: false,
-            message: "Access denied. Please login.",
-            data: null as T,
-          }
+          throw new Error("Access denied. Please login.")
         }
 
-        return {
-          success: false,
-          message: errorMessage,
-          data: null as T,
+        // Create a more detailed error for debugging
+        const detailedError = new Error(errorMessage)
+        detailedError.name = `APIError_${response.status}`
+        detailedError.cause = {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          method: options.method || "GET",
+          responseData: data,
+          requestHeaders: headers,
+          responseHeaders: Object.fromEntries(response.headers.entries()),
         }
+        throw detailedError
       }
 
       // Cache successful GET requests
@@ -248,15 +238,14 @@ export class ApiClient {
 
       return data
     } catch (error: any) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔄 API unavailable, returning error response:", url)
-      }
-
-      return {
-        success: false,
-        message: error.message || "Network error occurred",
-        data: null as T,
-      }
+      console.error("💥 API Request Failed:", {
+        error: error.message,
+        url: url,
+        method: options.method || "GET",
+        cause: error.cause,
+        stack: error.stack,
+      })
+      throw error
     }
   }
 
@@ -656,98 +645,9 @@ export class ApiClient {
     }
   }
 
-  // OTP Authentication methods
-  async sendOtp(phoneNumber: string) {
-    console.log("📱 Sending OTP to:", phoneNumber)
-    return this.request<{ success: boolean; message: string; otp?: string }>("/auth", {
-      method: "POST",
-      body: JSON.stringify({ action: "send-otp", phoneNumber }),
-    })
-  }
-
-  async verifyOtp(phoneNumber: string, otp: string) {
-    console.log("🔐 Verifying OTP for:", phoneNumber)
-    return this.request<{ success: boolean; message: string; verified: boolean }>("/auth", {
-      method: "POST",
-      body: JSON.stringify({ action: "verify-otp", phoneNumber, otp }),
-    })
-  }
-
-  async loginWithOtp(phoneNumber: string, otp: string) {
-    console.log("🔐 Logging in with OTP:", phoneNumber)
-    try {
-      const response = await this.request<any>("/auth", {
-        method: "POST",
-        body: JSON.stringify({ action: "login", phoneNumber, otp }),
-      })
-
-      console.log("🔐 OTP Login response:", response)
-
-      // Handle token and user data
-      if (response.success && response.data) {
-        const { token, user } = response.data
-        if (token) {
-          this.setToken(token)
-          console.log("✅ Token set successfully")
-        }
-        if (user) {
-          localStorage.setItem("user_data", JSON.stringify(user))
-          console.log("✅ User data stored successfully")
-        }
-      }
-
-      return response
-    } catch (error: any) {
-      console.error("💥 OTP Login failed:", error)
-      throw error
-    }
-  }
-
-  async registerWithOtp(data: {
-    name: string
-    phoneNumber: string
-    otp: string
-  }) {
-    console.log("🔐 Registering with OTP:", data.phoneNumber)
-    try {
-      const response = await this.request<any>("/auth", {
-        method: "POST",
-        body: JSON.stringify({
-          action: "register",
-          name: data.name,
-          phoneNumber: data.phoneNumber,
-          otp: data.otp,
-        }),
-      })
-
-      console.log("📋 OTP Registration response:", response)
-
-      // Handle token and user data
-      if (response.success && response.data) {
-        const { token, user } = response.data
-        if (token) {
-          this.setToken(token)
-          console.log("✅ Token set successfully")
-        }
-        if (user) {
-          localStorage.setItem("user_data", JSON.stringify(user))
-          console.log("✅ User data stored successfully")
-        }
-      }
-
-      return response
-    } catch (error: any) {
-      console.error("💥 OTP Registration failed:", error)
-      throw error
-    }
-  }
-
   async logout() {
     try {
-      await this.request("/auth", {
-        method: "POST",
-        body: JSON.stringify({ action: "logout" }),
-      })
+      await this.request("/auth/logout", { method: "POST" })
     } catch (error) {
       console.log("Logout API call failed, but continuing with local cleanup")
     }
@@ -755,6 +655,118 @@ export class ApiClient {
     this.requestCache.clear()
     localStorage.removeItem("auth_token")
     localStorage.removeItem("user_data")
+  }
+
+  async requestOtp(phone: string, purpose: "login" | "registration") {
+    console.log("📲 Requesting OTP:", { phone, purpose })
+    try {
+      const res = await this.request<any>("/auth/otp/request", {
+        method: "POST",
+        body: JSON.stringify({ phone, purpose }),
+      })
+      console.log("✅ OTP request response:", res)
+      return res
+    } catch (error: any) {
+      console.error("💥 OTP request failed:", error)
+      throw error
+    }
+  }
+
+  async verifyFirebaseOtp(params: { idToken: string; name?: string; rememberMe?: boolean }) {
+    console.log("🔐 Verifying Firebase OTP...")
+    try {
+      const res = await this.request<any>("/auth/otp/firebase/verify", {
+        method: "POST",
+        body: JSON.stringify(params),
+      })
+      console.log("✅ Firebase verify response:", res)
+
+      // Extract token and customer/user
+      let token: string | null = null
+      let userData: any = null
+
+      if (res.token) token = res.token
+      else if (res.data?.token) token = res.data.token
+
+      if (res.customer) userData = res.customer
+      else if (res.user) userData = res.user
+      else if (res.data?.customer) userData = res.data.customer
+      else if (res.data?.user) userData = res.data.user
+
+      if (token) this.setToken(token)
+      if (userData) localStorage.setItem("user_data", JSON.stringify(userData))
+
+      return {
+        success: true,
+        ...res,
+        data: res.data ?? undefined,
+      }
+    } catch (error: any) {
+      console.error("💥 Firebase OTP verify failed:", error)
+      throw error
+    }
+  }
+
+  async verifySmsOtp(params: {
+    phone: string
+    otp: string
+    purpose: "login" | "registration"
+    name?: string
+    rememberMe?: boolean
+  }) {
+    console.log("🔐 Verifying SMS OTP (fallback)...")
+    try {
+      const res = await this.request<any>("/auth/otp/verify", {
+        method: "POST",
+        body: JSON.stringify(params),
+      })
+      console.log("✅ SMS verify response:", res)
+
+      let token: string | null = null
+      let userData: any = null
+
+      if (res.token) token = res.token
+      else if (res.data?.token) token = res.data.token
+
+      if (res.customer) userData = res.customer
+      else if (res.user) userData = res.user
+      else if (res.data?.customer) userData = res.data.customer
+      else if (res.data?.user) userData = res.data.user
+
+      if (token) this.setToken(token)
+      if (userData) localStorage.setItem("user_data", JSON.stringify(userData))
+
+      return {
+        success: true,
+        ...res,
+        data: res.data ?? undefined,
+      }
+    } catch (error: any) {
+      console.error("💥 SMS OTP verify failed:", error)
+      throw error
+    }
+  }
+
+  async getFirebaseStatus() {
+    console.log("🔥 Getting Firebase status...")
+    try {
+      const res = await this.request<any>("/auth/otp/firebase/status")
+      return res
+    } catch (error: any) {
+      console.error("💥 Firebase status failed:", error)
+      throw error
+    }
+  }
+
+  async getFirebaseConfig() {
+    console.log("🔥 Getting Firebase config...")
+    try {
+      const res = await this.request<any>("/auth/otp/firebase/config")
+      return res
+    } catch (error: any) {
+      console.error("💥 Firebase config failed:", error)
+      throw error
+    }
   }
 
   // Product methods with better error handling and caching
