@@ -37,7 +37,7 @@ export default function RegisterPage() {
     setInfo("")
     setDevCode("")
     if (!isValidE164Phone(phone)) {
-      setError("Enter a valid phone e.g., +919234567890")
+      setError("Enter a valid phone in E.164 format, e.g., +14155552671 or +911234567890")
       return
     }
     setLoading(true)
@@ -50,8 +50,8 @@ export default function RegisterPage() {
     } catch (e: any) {
       const code = e?.code
       if (code === "OTP_RATE_LIMIT_EXCEEDED") {
-        setCooldown(600)
-        setError("Too many requests. Please retry after 10 minutes.")
+        setCooldown(e?.retryAfter ? Number(e.retryAfter) : 600)
+        setError("Too many requests. Please retry later.")
       } else {
         setError(e?.message || "Failed to send OTP")
       }
@@ -77,10 +77,8 @@ export default function RegisterPage() {
         name: displayName,
         rememberMe: true,
       })
-      // Save token and user, and sync ApiClient instance
       apiClient.setAuthToken(res.token)
       apiClient.setUserData(res.customer)
-      // Trigger storage event for header update
       window.dispatchEvent(new Event("storage"))
       router.push("/?welcome=true")
     } catch (e: any) {
@@ -90,8 +88,8 @@ export default function RegisterPage() {
       } else if (code === "INVALID_OTP") {
         setError("Invalid OTP. Please try again.")
       } else if (code === "OTP_RATE_LIMIT_EXCEEDED") {
-        setCooldown(600)
-        setError("Too many attempts. Please retry after 10 minutes.")
+        setCooldown(e?.retryAfter ? Number(e.retryAfter) : 600)
+        setError("Too many attempts. Please retry later.")
       } else {
         setError(e?.message || "Verification failed. Try again.")
       }
