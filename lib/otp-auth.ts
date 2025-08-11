@@ -91,7 +91,7 @@ export async function requestPhoneOtp(params: {
   storeId?: string
 }): Promise<OtpRequestSuccess> {
   const { phone, purpose = "login", channel = "sms", storeId = STORE_ID } = params
-  const url = `${OTP_DOMAIN}/api/store/${storeId}/auth/otp/request`
+  const url = `${OTP_DOMAIN}/api/${storeId}/auth/otp/request`
 
   const res = await fetch(url, {
     method: "POST",
@@ -122,7 +122,7 @@ export async function verifyPhoneOtp(params: {
   storeId?: string
 }): Promise<OtpVerifySuccess> {
   const { phone, otp, purpose = "login", name, rememberMe = true, storeId = STORE_ID } = params
-  const url = `${OTP_DOMAIN}/api/store/${storeId}/auth/otp/verify`
+  const url = `${OTP_DOMAIN}/api/${storeId}/auth/otp/verify`
 
   const res = await fetch(url, {
     method: "POST",
