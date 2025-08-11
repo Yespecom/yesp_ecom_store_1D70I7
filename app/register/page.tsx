@@ -1,9 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import type { ReactElement } from "react"
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -13,149 +11,166 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { apiClient } from "@/lib/api"
-import { ArrowLeft, User, Phone, MessageSquare } from "lucide-react"
+import { ArrowLeft, Phone, User, ShieldCheck, Timer, RotateCw } from "lucide-react"
+import { ensureFirebaseApp } from "@/lib/firebase-client"
+import type { ConfirmationResult } from "firebase/auth"
+import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"
 
-export default function RegisterPage(): ReactElement {
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    otp: "",
-    acceptTerms: false,
-  })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [step, setStep] = useState(1)
-  const [phoneVerified, setPhoneVerified] = useState(false)
-  const [otpSent, setOtpSent] = useState(false)
-  const [otpTimer, setOtpTimer] = useState(0)
+export default function RegisterPage() {
   const router = useRouter()
 
+  const [name, setName] = useState("")
+  const [phone, setPhone] = useState("")
+  const [otp, setOtp] = useState("")
+  const [acceptTerms, setAcceptTerms] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+
+  const [step, setStep] = useState<1 | 2>(1)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string>("")
+  const [info, setInfo] = useState<string>("")
+
+  const [provider, setProvider] = useState<"firebase" | "sms" | null>(null)
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null)
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null)
+  const [resendIn, setResendIn] = useState<number>(0)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const canSend = useMemo(() => {
+    return name.trim().length >= 2 && /^\+?[1-9]\d{7,14}$/.test(phone.trim())
+  }, [name, phone])
+
   useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (otpTimer > 0) {
-      interval = setInterval(() => {
-        setOtpTimer((prev) => prev - 1)
-      }, 1000)
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
     }
-    return () => clearInterval(interval)
-  }, [otpTimer])
+  }, [])
 
-  const sendOTP = async () => {
-    if (!formData.phone) {
-      setError("Please enter your phone number")
-      return
-    }
-
-    setLoading(true)
-    setError("")
-
-    try {
-      // Mock API call - replace with actual OTP service
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setOtpSent(true)
-      setOtpTimer(60)
-      setError("")
-    } catch (error: any) {
-      setError("Failed to send OTP. Please try again.")
-    } finally {
-      setLoading(false)
-    }
+  const startResendCountdown = () => {
+    setResendIn(60)
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = setInterval(() => {
+      setResendIn((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
   }
 
-  const verifyOTP = async () => {
-    if (!formData.otp) {
-      setError("Please enter the OTP")
+  const setupRecaptcha = (auth: any) => {
+    if (recaptchaRef.current) return recaptchaRef.current
+    recaptchaRef.current = new RecaptchaVerifier(
+      "recaptcha-container-register",
+      {
+        size: "invisible",
+      },
+      auth,
+    )
+    return recaptchaRef.current
+  }
+
+  const sendOtp = async () => {
+    if (!acceptTerms) {
+      setError("Please accept the terms and conditions")
       return
     }
-
     setLoading(true)
     setError("")
-
+    setInfo("")
     try {
-      // Mock OTP verification - replace with actual API
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      if (formData.otp === "123456") {
-        // Mock OTP for demo
-        setPhoneVerified(true)
-        setStep(3)
-        setError("")
+      const res: any = await apiClient.requestOtp(phone.trim(), "registration")
+
+      const providerResp = res?.provider || res?.data?.provider || "firebase"
+      setProvider(providerResp)
+
+      if (providerResp === "firebase") {
+        const config = res?.config || res?.data?.config
+        if (!config) {
+          throw new Error("Missing Firebase config from server")
+        }
+        const { auth } = ensureFirebaseApp(config)
+        const verifier = setupRecaptcha(auth)
+        const confirmation = await signInWithPhoneNumber(auth, phone.trim(), verifier)
+        confirmationResultRef.current = confirmation
+        setStep(2)
+        setInfo("OTP sent. Please check your phone.")
+        startResendCountdown()
       } else {
-        setError("Invalid OTP. Please try again.")
+        // Fallback SMS flow
+        setStep(2)
+        setInfo("OTP sent via SMS. Please enter it below.")
+        startResendCountdown()
       }
-    } catch (error: any) {
-      setError("OTP verification failed. Please try again.")
+    } catch (err: any) {
+      console.error("Send OTP error:", err)
+      setError(err?.message || "Failed to send OTP")
     } finally {
       setLoading(false)
     }
   }
 
-  const nextStep = () => {
-    if (step === 1) {
-      if (!formData.name.trim()) {
-        setError("Please enter your full name")
-        return
-      }
-      setError("")
-      setStep(2)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const verifyOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (step === 2) {
-      if (!otpSent) {
-        await sendOTP()
-        return
-      }
-      await verifyOTP()
-      return
-    }
-
-    if (step === 3) {
-      if (!formData.acceptTerms) {
-        setError("Please accept the terms and conditions")
-        return
-      }
-
-      setLoading(true)
-      setError("")
-
-      try {
-        // Split name into first and last name
-        const nameParts = formData.name.trim().split(" ")
-        const firstName = nameParts[0] || ""
-        const lastName = nameParts.slice(1).join(" ") || ""
-
-        const response = await apiClient.register({
-          firstName: firstName,
-          lastName: lastName,
-          phone: formData.phone,
+    setLoading(true)
+    setError("")
+    setInfo("")
+    try {
+      if (provider === "firebase") {
+        const confirmation = confirmationResultRef.current
+        if (!confirmation) {
+          throw new Error("OTP session expired. Please resend OTP.")
+        }
+        const cred = await confirmation.confirm(otp.trim())
+        const idToken = await cred.user.getIdToken()
+        const result: any = await apiClient.verifyFirebaseOtp({
+          idToken,
+          name: name.trim(),
+          rememberMe,
         })
 
-        if (response.success && response.data) {
-          // Store user data for immediate header update
-          const userData = {
-            name: formData.name,
-            phone: formData.phone,
+        if (result?.success !== false) {
+          // Store a simple header-friendly name if not present
+          const headerUser = {
+            name: result?.customer?.name || name.trim(),
+            phone: phone.trim(),
+            email: result?.customer?.email || "",
           }
-          localStorage.setItem("user_data", JSON.stringify(userData))
-
-          // Trigger storage event for header update
+          localStorage.setItem("user_data", JSON.stringify(headerUser))
           window.dispatchEvent(new Event("storage"))
-
-          // Redirect to home page
           router.push("/?welcome=true")
-        } else {
-          setError(response.message || "Registration failed")
+          return
         }
-      } catch (error: any) {
-        console.error("Registration error:", error)
-        setError(error.message || "Registration failed")
-      } finally {
-        setLoading(false)
+        throw new Error(result?.message || "Registration failed")
+      } else {
+        // Fallback SMS verification
+        const result: any = await apiClient.verifySmsOtp({
+          phone: phone.trim(),
+          otp: otp.trim(),
+          purpose: "registration",
+          name: name.trim(),
+          rememberMe,
+        })
+        if (result?.success !== false) {
+          window.dispatchEvent(new Event("storage"))
+          router.push("/?welcome=true")
+          return
+        }
+        throw new Error(result?.message || "Registration failed")
       }
+    } catch (err: any) {
+      console.error("Verify OTP error:", err)
+      setError(err?.message || "Invalid OTP. Please try again.")
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const resend = async () => {
+    if (resendIn > 0 || loading) return
+    await sendOtp()
   }
 
   return (
@@ -173,8 +188,7 @@ export default function RegisterPage(): ReactElement {
           <div className="max-w-md text-center">
             <h1 className="text-4xl font-bold mb-6">Join oneofwun</h1>
             <p className="text-lg text-gray-200 mb-8">
-              Create your account with just your phone number and discover premium fashion that defines your unique
-              style.
+              Create your account with your phone and discover premium fashion that defines your unique style.
             </p>
             <div className="space-y-4 text-left">
               <div className="flex items-center space-x-3">
@@ -198,7 +212,7 @@ export default function RegisterPage(): ReactElement {
         </div>
       </div>
 
-      {/* Right Side - Registration Form */}
+      {/* Right Side - Phone OTP Registration */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Back to Home */}
@@ -222,242 +236,190 @@ export default function RegisterPage(): ReactElement {
 
               <CardTitle className="text-2xl font-bold text-gray-900">Create Account</CardTitle>
               <CardDescription className="text-gray-600">
-                {step === 1
-                  ? "Let's start with your basic information"
-                  : step === 2
-                    ? otpSent
-                      ? "Enter the OTP sent to your phone"
-                      : "Verify your phone number"
-                    : "Complete your account setup"}
+                {step === 1 ? "Let’s start with your details" : "We’ve sent an OTP to your phone"}
               </CardDescription>
 
+              {/* Progress Indicator */}
               <div className="flex items-center justify-center space-x-2 mt-6">
-                <div className={`w-6 h-2 rounded-full ${step >= 1 ? "bg-black" : "bg-gray-200"}`}></div>
-                <div className={`w-6 h-2 rounded-full ${step >= 2 ? "bg-black" : "bg-gray-200"}`}></div>
-                <div className={`w-6 h-2 rounded-full ${step >= 3 ? "bg-black" : "bg-gray-200"}`}></div>
+                <div className={`w-8 h-2 rounded-full ${step >= 1 ? "bg-black" : "bg-gray-200"}`}></div>
+                <div className={`w-8 h-2 rounded-full ${step >= 2 ? "bg-black" : "bg-gray-200"}`}></div>
               </div>
             </CardHeader>
 
             <CardContent className="space-y-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm flex items-center">
-                    <div className="w-2 h-2 bg-red-500 rounded-full mr-3"></div>
-                    {error}
-                  </div>
-                )}
+              {/* Alerts */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">{error}</div>
+              )}
+              {info && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm">
+                  {info}
+                </div>
+              )}
 
-                {step === 1 && (
-                  <>
-                    {/* Name Field */}
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                        Full Name
+              {step === 1 && (
+                <div className="space-y-6">
+                  {/* Name */}
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                      Full Name
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        id="name"
+                        type="text"
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                        placeholder="Enter your full name"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Phone */}
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
+                      Phone Number
+                    </Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        id="phone"
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="+1 555 123 4567"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      We&apos;ll send an OTP to verify your number.
+                    </p>
+                  </div>
+
+                  {/* Terms and Remember */}
+                  <div className="space-y-4">
+                    <div className="flex items-start space-x-3">
+                      <Checkbox
+                        id="terms"
+                        checked={acceptTerms}
+                        onCheckedChange={(checked) => setAcceptTerms(!!checked)}
+                        className="mt-1 rounded border-gray-300"
+                      />
+                      <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
+                        I agree to the{" "}
+                        <Link href="/terms" className="text-black hover:underline font-medium">
+                          Terms of Service
+                        </Link>{" "}
+                        and{" "}
+                        <Link href="/privacy" className="text-black hover:underline font-medium">
+                          Privacy Policy
+                        </Link>
                       </Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
-                          id="name"
-                          type="text"
-                          required
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
-                          placeholder="Enter your full name"
-                        />
-                      </div>
                     </div>
 
-                    {/* Next Button */}
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        id="remember"
+                        checked={rememberMe}
+                        onCheckedChange={(checked) => setRememberMe(!!checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor="remember" className="text-sm text-gray-600">
+                        Keep me signed in
+                      </Label>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={sendOtp}
+                    disabled={!canSend || loading}
+                    className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                  >
+                    {loading ? "Sending OTP..." : "Continue"}
+                  </Button>
+
+                  <div id="recaptcha-container-register" className="hidden" aria-hidden="true" />
+                </div>
+              )}
+
+              {step === 2 && (
+                <form onSubmit={verifyOtp} className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
+                      Enter OTP
+                    </Label>
+                    <div className="flex gap-3">
+                      <Input
+                        id="otp"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="6-digit code"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value)}
+                        className="h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={resend}
+                        disabled={resendIn > 0 || loading}
+                        className="h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent min-w-[120px]"
+                        title={resendIn > 0 ? `Resend in ${resendIn}s` : "Resend OTP"}
+                      >
+                        <RotateCw className="h-4 w-4 mr-2" />
+                        {resendIn > 0 ? `${resendIn}s` : "Resend"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                      <Timer className="h-3.5 w-3.5" />
+                      Code expires in 10 minutes
+                    </p>
+                  </div>
+
+                  <div className="flex space-x-4">
                     <Button
                       type="button"
-                      onClick={nextStep}
-                      className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                      onClick={() => {
+                        setStep(1)
+                        setOtp("")
+                        setInfo("")
+                        setError("")
+                      }}
+                      variant="outline"
+                      className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
                     >
-                      Continue
+                      Back
                     </Button>
-                  </>
-                )}
+                    <Button
+                      type="submit"
+                      disabled={otp.trim().length < 4 || loading}
+                      className="flex-1 h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                    >
+                      {loading ? "Verifying..." : "Create Account"}
+                    </Button>
+                  </div>
 
-                {step === 2 && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
-                        Phone Number
-                      </Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
-                          id="phone"
-                          type="tel"
-                          required
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
-                          placeholder="+91 98765 43210"
-                          disabled={otpSent}
-                        />
-                        {phoneVerified && (
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                <path
-                                  fillRule="evenodd"
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* OTP Field */}
-                    {otpSent && !phoneVerified && (
-                      <div className="space-y-2">
-                        <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
-                          Enter OTP
-                        </Label>
-                        <div className="relative">
-                          <MessageSquare className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                          <Input
-                            id="otp"
-                            type="text"
-                            required
-                            maxLength={6}
-                            value={formData.otp}
-                            onChange={(e) => setFormData({ ...formData, otp: e.target.value.replace(/\D/g, "") })}
-                            className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-center text-lg tracking-widest"
-                            placeholder="123456"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">OTP sent to {formData.phone}</span>
-                          {otpTimer > 0 ? (
-                            <span className="text-gray-500">Resend in {otpTimer}s</span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={sendOTP}
-                              className="text-black hover:text-gray-700 font-medium"
-                              disabled={loading}
-                            >
-                              Resend OTP
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex space-x-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setStep(1)}
-                        className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg"
-                        disabled={loading}
-                      >
-                        Back
-                      </Button>
-                      <Button
-                        type="submit"
-                        className="flex-1 h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <div className="flex items-center">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                            {!otpSent ? "Sending..." : "Verifying..."}
-                          </div>
-                        ) : !otpSent ? (
-                          "Send OTP"
-                        ) : (
-                          "Verify OTP"
-                        )}
-                      </Button>
-                    </div>
-                  </>
-                )}
-
-                {step === 3 && (
-                  <>
-                    {/* Terms and Conditions */}
-                    <div className="space-y-4">
-                      <div className="flex items-start space-x-3">
-                        <Checkbox
-                          id="terms"
-                          checked={formData.acceptTerms}
-                          onCheckedChange={(checked) => setFormData({ ...formData, acceptTerms: checked as boolean })}
-                          className="mt-1 rounded border-gray-300"
-                        />
-                        <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
-                          I agree to the{" "}
-                          <Link href="/terms" className="text-black hover:underline font-medium">
-                            Terms of Service
-                          </Link>{" "}
-                          and{" "}
-                          <Link href="/privacy" className="text-black hover:underline font-medium">
-                            Privacy Policy
-                          </Link>
-                        </Label>
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setStep(2)}
-                        className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg"
-                        disabled={loading}
-                      >
-                        Back
-                      </Button>
-                      <Button
-                        type="submit"
-                        className="flex-1 h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                        disabled={loading || !formData.acceptTerms}
-                      >
-                        {loading ? (
-                          <div className="flex items-center">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                            Creating Account...
-                          </div>
-                        ) : (
-                          "Create Account"
-                        )}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </form>
+                  <div id="recaptcha-container-register" className="hidden" aria-hidden="true" />
+                </form>
+              )}
 
               {/* Sign In Link */}
               <div className="text-center pt-6 border-t border-gray-100">
                 <p className="text-sm text-gray-600">
                   Already have an account?{" "}
                   <Link href="/login" className="text-black hover:text-gray-700 font-medium">
-                    Sign in here
+                    Sign in instead
                   </Link>
                 </p>
               </div>
             </CardContent>
           </Card>
-
-          {/* Footer */}
-          <div className="text-center mt-8 text-xs text-gray-500">
-            <p>
-              By creating an account, you agree to our{" "}
-              <Link href="/terms" className="text-black hover:underline">
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy" className="text-black hover:underline">
-                Privacy Policy
-              </Link>
-            </p>
-          </div>
         </div>
       </div>
     </div>
