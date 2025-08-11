@@ -656,9 +656,98 @@ export class ApiClient {
     }
   }
 
+  // OTP Authentication methods
+  async sendOtp(phoneNumber: string) {
+    console.log("📱 Sending OTP to:", phoneNumber)
+    return this.request<{ success: boolean; message: string; otp?: string }>("/auth", {
+      method: "POST",
+      body: JSON.stringify({ action: "send-otp", phoneNumber }),
+    })
+  }
+
+  async verifyOtp(phoneNumber: string, otp: string) {
+    console.log("🔐 Verifying OTP for:", phoneNumber)
+    return this.request<{ success: boolean; message: string; verified: boolean }>("/auth", {
+      method: "POST",
+      body: JSON.stringify({ action: "verify-otp", phoneNumber, otp }),
+    })
+  }
+
+  async loginWithOtp(phoneNumber: string, otp: string) {
+    console.log("🔐 Logging in with OTP:", phoneNumber)
+    try {
+      const response = await this.request<any>("/auth", {
+        method: "POST",
+        body: JSON.stringify({ action: "login", phoneNumber, otp }),
+      })
+
+      console.log("🔐 OTP Login response:", response)
+
+      // Handle token and user data
+      if (response.success && response.data) {
+        const { token, user } = response.data
+        if (token) {
+          this.setToken(token)
+          console.log("✅ Token set successfully")
+        }
+        if (user) {
+          localStorage.setItem("user_data", JSON.stringify(user))
+          console.log("✅ User data stored successfully")
+        }
+      }
+
+      return response
+    } catch (error: any) {
+      console.error("💥 OTP Login failed:", error)
+      throw error
+    }
+  }
+
+  async registerWithOtp(data: {
+    name: string
+    phoneNumber: string
+    otp: string
+  }) {
+    console.log("🔐 Registering with OTP:", data.phoneNumber)
+    try {
+      const response = await this.request<any>("/auth", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "register",
+          name: data.name,
+          phoneNumber: data.phoneNumber,
+          otp: data.otp,
+        }),
+      })
+
+      console.log("📋 OTP Registration response:", response)
+
+      // Handle token and user data
+      if (response.success && response.data) {
+        const { token, user } = response.data
+        if (token) {
+          this.setToken(token)
+          console.log("✅ Token set successfully")
+        }
+        if (user) {
+          localStorage.setItem("user_data", JSON.stringify(user))
+          console.log("✅ User data stored successfully")
+        }
+      }
+
+      return response
+    } catch (error: any) {
+      console.error("💥 OTP Registration failed:", error)
+      throw error
+    }
+  }
+
   async logout() {
     try {
-      await this.request("/auth/logout", { method: "POST" })
+      await this.request("/auth", {
+        method: "POST",
+        body: JSON.stringify({ action: "logout" }),
+      })
     } catch (error) {
       console.log("Logout API call failed, but continuing with local cleanup")
     }
