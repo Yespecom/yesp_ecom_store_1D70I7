@@ -129,6 +129,13 @@ export class ApiClient {
     }
   }
 
+  private buildAuthHeaders(contentTypeJson = true) {
+    const headers: Record<string, string> = {}
+    if (contentTypeJson) headers["Content-Type"] = "application/json"
+    if (this.token) headers["Authorization"] = `Bearer ${this.token}`
+    return headers
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     // Prevent rapid successive requests
     const now = Date.now()
@@ -660,10 +667,17 @@ export class ApiClient {
   async requestOtp(phone: string, purpose: "login" | "registration") {
     console.log("📲 Requesting OTP:", { phone, purpose })
     try {
-      const res = await this.request<any>("/auth/otp/request", {
+      const resp = await fetch("/api/auth/otp/request", {
         method: "POST",
+        headers: this.buildAuthHeaders(),
         body: JSON.stringify({ phone, purpose }),
       })
+      // Handle non-2xx for better error surfaces
+      if (!resp.ok) {
+        const text = await resp.text()
+        throw new Error(`OTP request failed: HTTP ${resp.status} - ${text}`)
+      }
+      const res = await resp.json()
       console.log("✅ OTP request response:", res)
       return res
     } catch (error: any) {
@@ -675,10 +689,16 @@ export class ApiClient {
   async verifyFirebaseOtp(params: { idToken: string; name?: string; rememberMe?: boolean }) {
     console.log("🔐 Verifying Firebase OTP...")
     try {
-      const res = await this.request<any>("/auth/otp/firebase/verify", {
+      const resp = await fetch("/api/auth/otp/firebase/verify", {
         method: "POST",
+        headers: this.buildAuthHeaders(),
         body: JSON.stringify(params),
       })
+      if (!resp.ok) {
+        const text = await resp.text()
+        throw new Error(`Firebase verify failed: HTTP ${resp.status} - ${text}`)
+      }
+      const res = await resp.json()
       console.log("✅ Firebase verify response:", res)
 
       // Extract token and customer/user
@@ -696,11 +716,7 @@ export class ApiClient {
       if (token) this.setToken(token)
       if (userData) localStorage.setItem("user_data", JSON.stringify(userData))
 
-      return {
-        success: true,
-        ...res,
-        data: res.data ?? undefined,
-      }
+      return { success: true, ...res, data: res.data ?? undefined }
     } catch (error: any) {
       console.error("💥 Firebase OTP verify failed:", error)
       throw error
@@ -716,10 +732,16 @@ export class ApiClient {
   }) {
     console.log("🔐 Verifying SMS OTP (fallback)...")
     try {
-      const res = await this.request<any>("/auth/otp/verify", {
+      const resp = await fetch("/api/auth/otp/verify", {
         method: "POST",
+        headers: this.buildAuthHeaders(),
         body: JSON.stringify(params),
       })
+      if (!resp.ok) {
+        const text = await resp.text()
+        throw new Error(`SMS verify failed: HTTP ${resp.status} - ${text}`)
+      }
+      const res = await resp.json()
       console.log("✅ SMS verify response:", res)
 
       let token: string | null = null
@@ -736,11 +758,7 @@ export class ApiClient {
       if (token) this.setToken(token)
       if (userData) localStorage.setItem("user_data", JSON.stringify(userData))
 
-      return {
-        success: true,
-        ...res,
-        data: res.data ?? undefined,
-      }
+      return { success: true, ...res, data: res.data ?? undefined }
     } catch (error: any) {
       console.error("💥 SMS OTP verify failed:", error)
       throw error
@@ -750,8 +768,15 @@ export class ApiClient {
   async getFirebaseStatus() {
     console.log("🔥 Getting Firebase status...")
     try {
-      const res = await this.request<any>("/auth/otp/firebase/status")
-      return res
+      const resp = await fetch("/api/auth/otp/firebase/status", {
+        method: "GET",
+        headers: this.buildAuthHeaders(false),
+      })
+      if (!resp.ok) {
+        const text = await resp.text()
+        throw new Error(`Firebase status failed: HTTP ${resp.status} - ${text}`)
+      }
+      return await resp.json()
     } catch (error: any) {
       console.error("💥 Firebase status failed:", error)
       throw error
@@ -761,8 +786,15 @@ export class ApiClient {
   async getFirebaseConfig() {
     console.log("🔥 Getting Firebase config...")
     try {
-      const res = await this.request<any>("/auth/otp/firebase/config")
-      return res
+      const resp = await fetch("/api/auth/otp/firebase/config", {
+        method: "GET",
+        headers: this.buildAuthHeaders(false),
+      })
+      if (!resp.ok) {
+        const text = await resp.text()
+        throw new Error(`Firebase config failed: HTTP ${resp.status} - ${text}`)
+      }
+      return await resp.json()
     } catch (error: any) {
       console.error("💥 Firebase config failed:", error)
       throw error
