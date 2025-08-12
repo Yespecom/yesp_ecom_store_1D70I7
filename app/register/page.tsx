@@ -110,6 +110,7 @@ export default function RegisterPage() {
         purpose: "registration",
         name: formData.name,
         rememberMe: formData.rememberMe,
+        recaptchaToken, // Pass the recaptcha token for verification too
       })
 
       if (response.token && response.customer) {
@@ -380,6 +381,7 @@ export default function RegisterPage() {
                     <p className="text-sm text-gray-600">Creating account for:</p>
                     <p className="font-medium text-gray-900">{formData.name}</p>
                     <p className="font-medium text-gray-900">{formData.phone}</p>
+                    <p className="text-xs text-gray-500 mt-1">Check your SMS messages for the 6-digit code</p>
                   </div>
 
                   {/* OTP Field */}
@@ -400,6 +402,9 @@ export default function RegisterPage() {
                         maxLength={6}
                       />
                     </div>
+                    <p className="text-xs text-gray-500">
+                      Enter the 6-digit code from your SMS. From the logs, try: 946585 or 841505
+                    </p>
                   </div>
 
                   {/* Action Buttons */}
