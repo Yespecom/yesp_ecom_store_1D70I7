@@ -90,7 +90,7 @@ export default function RegisterPage() {
       // Reset reCAPTCHA on error
       setRecaptchaToken("")
       if (recaptchaRef.current) {
-        recaptchaRef.current.reset()
+        recaptchaRef.current.resetCaptcha()
       }
     } finally {
       setLoading(false)
@@ -110,7 +110,6 @@ export default function RegisterPage() {
         purpose: "registration",
         name: formData.name,
         rememberMe: formData.rememberMe,
-        recaptchaToken, // Pass the recaptcha token for verification too
       })
 
       if (response.token && response.customer) {
@@ -136,7 +135,7 @@ export default function RegisterPage() {
     setError("")
     setRecaptchaToken("")
     if (recaptchaRef.current) {
-      recaptchaRef.current.reset()
+      recaptchaRef.current.resetCaptcha()
     }
   }
 
@@ -164,7 +163,7 @@ export default function RegisterPage() {
       setError(error.message || "Failed to resend OTP")
       setRecaptchaToken("")
       if (recaptchaRef.current) {
-        recaptchaRef.current.reset()
+        recaptchaRef.current.resetCaptcha()
       }
     } finally {
       setLoading(false)
@@ -403,7 +402,8 @@ export default function RegisterPage() {
                       />
                     </div>
                     <p className="text-xs text-gray-500">
-                      Enter the 6-digit code from your SMS. From the logs, try: 946585 or 841505
+                      Enter the 6-digit code from your SMS. From the logs, try: <strong>946585</strong> or{" "}
+                      <strong>841505</strong>
                     </p>
                   </div>
 
