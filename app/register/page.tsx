@@ -2,14 +2,13 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, ArrowLeft, Phone, Mail, User, Shield, Sparkles } from "lucide-react"
+import { Loader2, ArrowLeft, Phone, Mail, User, Shield, Sparkles, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 import { sendFirebaseOTP, verifyFirebaseOTP, cleanupFirebaseAuth } from "@/lib/firebase-auth"
 import { formatPhoneNumber, validatePhoneNumber } from "@/lib/otp-auth"
@@ -135,279 +134,294 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-white to-gray-100">
-        <div className="absolute inset-0 opacity-5">
-          <Image src="/images/auth-bg.png" alt="Background" fill className="object-cover" />
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background decorations */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-blue-400/20 to-indigo-400/20 rounded-full blur-3xl"></div>
       </div>
 
       {/* reCAPTCHA container */}
       <div id="recaptcha-container"></div>
 
-      <div className="relative z-10 min-h-screen flex">
-        {/* Left side - Visual */}
-        <div className="hidden lg:flex lg:w-1/2 bg-black relative overflow-hidden">
-          <div className="absolute inset-0">
-            <Image
-              src="/images/fashion-collage.png"
-              alt="Fashion Collection"
-              fill
-              className="object-cover opacity-80"
-            />
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-          <div className="relative z-10 flex flex-col justify-between p-12 text-white">
-            <div>
-              <div className="flex items-center space-x-3 mb-8">
-                <Image src="/images/oneofwun-logo.png" alt="OneofWun" width={40} height={40} className="rounded-lg" />
-                <span className="text-2xl font-bold">OneofWun</span>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold">Join the Fashion Revolution</h2>
-                <p className="text-gray-300 text-lg">Discover unique pieces that define your style. Be one of one.</p>
-              </div>
-
-              <div className="flex items-center space-x-2 text-sm text-gray-400">
-                <Sparkles className="h-4 w-4" />
-                <span>Curated collections • Premium quality • Exclusive designs</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right side - Form */}
-        <div className="flex-1 flex items-center justify-center p-4 lg:p-12">
-          <div className="w-full max-w-md">
-            {/* Mobile logo */}
-            <div className="lg:hidden text-center mb-8">
-              <div className="flex items-center justify-center space-x-3 mb-4">
-                <Image src="/images/oneofwun-logo.png" alt="OneofWun" width={32} height={32} className="rounded-lg" />
-                <span className="text-xl font-bold text-gray-900">OneofWun</span>
-              </div>
-            </div>
-
-            <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
-              <CardHeader className="space-y-4 pb-6">
-                <div className="flex items-center justify-between">
-                  {step === 2 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleBackToStep1}
-                      className="p-2 hover:bg-gray-100 rounded-full"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <div className="flex-1 text-center">
-                    <CardTitle className="text-2xl font-bold text-gray-900">
-                      {step === 1 ? "Create Account" : "Verify Phone"}
-                    </CardTitle>
-                    <CardDescription className="text-gray-600 mt-2">
-                      {step === 1
-                        ? "Join OneofWun and discover unique fashion"
-                        : `Enter the 6-digit code sent to ${formData.phone}`}
-                    </CardDescription>
-                  </div>
-                  <div className="w-8" /> {/* Spacer for centering */}
-                </div>
-
-                {/* Progress indicator */}
-                <div className="flex items-center justify-center space-x-2">
-                  <div className={`w-3 h-3 rounded-full transition-colors ${step >= 1 ? "bg-black" : "bg-gray-300"}`} />
-                  <div className={`w-8 h-1 transition-colors ${step >= 2 ? "bg-black" : "bg-gray-300"}`} />
-                  <div className={`w-3 h-3 rounded-full transition-colors ${step >= 2 ? "bg-black" : "bg-gray-300"}`} />
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-6">
-                {step === 1 ? (
-                  <>
-                    {/* Step 1: Personal Information */}
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                          Full Name
-                        </Label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                          <Input
-                            id="name"
-                            type="text"
-                            placeholder="Enter your full name"
-                            value={formData.name}
-                            onChange={(e) => handleInputChange("name", e.target.value)}
-                            className={`pl-10 h-12 transition-colors ${errors.name ? "border-red-500 focus:border-red-500" : "border-gray-200 focus:border-black"}`}
-                          />
-                        </div>
-                        {errors.name && <p className="text-sm text-red-600">{errors.name}</p>}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                          Email Address
-                        </Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="Enter your email address"
-                            value={formData.email}
-                            onChange={(e) => handleInputChange("email", e.target.value)}
-                            className={`pl-10 h-12 transition-colors ${errors.email ? "border-red-500 focus:border-red-500" : "border-gray-200 focus:border-black"}`}
-                          />
-                        </div>
-                        {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
-                          Phone Number
-                        </Label>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                          <Input
-                            id="phone"
-                            type="tel"
-                            placeholder="Enter your phone number"
-                            value={formData.phone}
-                            onChange={(e) => handleInputChange("phone", e.target.value)}
-                            className={`pl-10 h-12 transition-colors ${errors.phone ? "border-red-500 focus:border-red-500" : "border-gray-200 focus:border-black"}`}
-                          />
-                        </div>
-                        {errors.phone && <p className="text-sm text-red-600">{errors.phone}</p>}
-                      </div>
-
-                      <div className="flex items-start space-x-3 pt-2">
-                        <Checkbox
-                          id="terms"
-                          checked={formData.agreeToTerms}
-                          onCheckedChange={(checked) => handleInputChange("agreeToTerms", checked as boolean)}
-                          className={errors.agreeToTerms ? "border-red-500" : ""}
-                        />
-                        <div className="space-y-1">
-                          <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
-                            I agree to the{" "}
-                            <Link href="/terms" className="text-black hover:underline font-medium">
-                              Terms of Service
-                            </Link>{" "}
-                            and{" "}
-                            <Link href="/privacy" className="text-black hover:underline font-medium">
-                              Privacy Policy
-                            </Link>
-                          </Label>
-                          {errors.agreeToTerms && <p className="text-sm text-red-600">{errors.agreeToTerms}</p>}
-                        </div>
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={handleSendOTP}
-                      disabled={loading}
-                      className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium transition-colors"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Sending OTP...
-                        </>
-                      ) : (
-                        <>
-                          <Shield className="mr-2 h-5 w-5" />
-                          Send Verification Code
-                        </>
-                      )}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    {/* Step 2: OTP Verification */}
-                    <div className="space-y-4">
-                      <div className="text-center">
-                        <div className="w-16 h-16 bg-black/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Shield className="h-8 w-8 text-black" />
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          We've sent a 6-digit verification code to your phone number
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
-                          Verification Code
-                        </Label>
-                        <Input
-                          id="otp"
-                          type="text"
-                          placeholder="Enter 6-digit code"
-                          value={formData.otp}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, "").slice(0, 6)
-                            handleInputChange("otp", value)
-                          }}
-                          className={`text-center text-lg font-mono h-12 transition-colors ${
-                            errors.otp ? "border-red-500 focus:border-red-500" : "border-gray-200 focus:border-black"
-                          }`}
-                          maxLength={6}
-                          autoComplete="one-time-code"
-                        />
-                        {errors.otp && <p className="text-sm text-red-600">{errors.otp}</p>}
-                      </div>
-
-                      <Alert className="border-blue-200 bg-blue-50">
-                        <AlertDescription className="text-sm text-blue-800">
-                          Didn't receive the code? Check your messages or try again in a few moments.
-                        </AlertDescription>
-                      </Alert>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Button
-                        onClick={handleVerifyOTP}
-                        disabled={loading || formData.otp.length !== 6}
-                        className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium transition-colors"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            Verifying...
-                          </>
-                        ) : (
-                          "Complete Registration"
-                        )}
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        onClick={handleSendOTP}
-                        disabled={loading}
-                        className="w-full h-12 border-gray-200 hover:bg-gray-50 bg-transparent transition-colors"
-                      >
-                        Resend Code
-                      </Button>
-                    </div>
-                  </>
+      <div className="w-full max-w-lg relative z-10">
+        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-xl rounded-3xl overflow-hidden">
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-8 text-white relative">
+            <div className="absolute inset-0 bg-black/10"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-6">
+                {step === 2 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBackToStep1}
+                    className="p-2 hover:bg-white/20 rounded-full text-white border-white/20"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
                 )}
-
-                <div className="text-center pt-4 border-t border-gray-100">
-                  <p className="text-sm text-gray-600">
-                    Already have an account?{" "}
-                    <Link href="/login" className="text-black hover:underline font-medium">
-                      Sign in
-                    </Link>
-                  </p>
+                <div className="flex-1 text-center">
+                  <div className="flex items-center justify-center mb-3">
+                    <Sparkles className="h-8 w-8 mr-2" />
+                    <CardTitle className="text-3xl font-bold">
+                      {step === 1 ? "Join OneofWun" : "Almost There!"}
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-indigo-100 text-lg">
+                    {step === 1
+                      ? "Create your account and discover unique fashion"
+                      : "Enter the verification code we sent to your phone"}
+                  </CardDescription>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="w-8" />
+              </div>
+
+              {/* Enhanced progress indicator */}
+              <div className="flex items-center justify-center space-x-3">
+                <div
+                  className={`w-4 h-4 rounded-full transition-all duration-300 ${step >= 1 ? "bg-white shadow-lg" : "bg-white/30"}`}
+                />
+                <div
+                  className={`w-12 h-1 rounded-full transition-all duration-300 ${step >= 2 ? "bg-white" : "bg-white/30"}`}
+                />
+                <div
+                  className={`w-4 h-4 rounded-full transition-all duration-300 ${step >= 2 ? "bg-white shadow-lg" : "bg-white/30"}`}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+
+          <CardContent className="p-8 space-y-8">
+            {step === 1 ? (
+              <>
+                {/* Step 1: Personal Information */}
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="name" className="text-sm font-semibold text-gray-700 flex items-center">
+                      <User className="h-4 w-4 mr-2 text-indigo-500" />
+                      Full Name
+                    </Label>
+                    <Input
+                      id="name"
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      className={`h-14 text-lg rounded-xl border-2 transition-all duration-200 ${
+                        errors.name
+                          ? "border-red-400 focus:border-red-500 bg-red-50"
+                          : "border-gray-200 focus:border-indigo-500 hover:border-gray-300"
+                      }`}
+                    />
+                    {errors.name && (
+                      <p className="text-sm text-red-600 flex items-center">
+                        <span className="w-1 h-1 bg-red-600 rounded-full mr-2"></span>
+                        {errors.name}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label htmlFor="email" className="text-sm font-semibold text-gray-700 flex items-center">
+                      <Mail className="h-4 w-4 mr-2 text-indigo-500" />
+                      Email Address
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email address"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange("email", e.target.value)}
+                      className={`h-14 text-lg rounded-xl border-2 transition-all duration-200 ${
+                        errors.email
+                          ? "border-red-400 focus:border-red-500 bg-red-50"
+                          : "border-gray-200 focus:border-indigo-500 hover:border-gray-300"
+                      }`}
+                    />
+                    {errors.email && (
+                      <p className="text-sm text-red-600 flex items-center">
+                        <span className="w-1 h-1 bg-red-600 rounded-full mr-2"></span>
+                        {errors.email}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label htmlFor="phone" className="text-sm font-semibold text-gray-700 flex items-center">
+                      <Phone className="h-4 w-4 mr-2 text-indigo-500" />
+                      Phone Number
+                    </Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="Enter your phone number"
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange("phone", e.target.value)}
+                      className={`h-14 text-lg rounded-xl border-2 transition-all duration-200 ${
+                        errors.phone
+                          ? "border-red-400 focus:border-red-500 bg-red-50"
+                          : "border-gray-200 focus:border-indigo-500 hover:border-gray-300"
+                      }`}
+                    />
+                    {errors.phone && (
+                      <p className="text-sm text-red-600 flex items-center">
+                        <span className="w-1 h-1 bg-red-600 rounded-full mr-2"></span>
+                        {errors.phone}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="bg-gray-50 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-start space-x-4">
+                      <Checkbox
+                        id="terms"
+                        checked={formData.agreeToTerms}
+                        onCheckedChange={(checked) => handleInputChange("agreeToTerms", checked as boolean)}
+                        className={`mt-1 ${errors.agreeToTerms ? "border-red-500" : "border-indigo-300"}`}
+                      />
+                      <div className="space-y-2">
+                        <Label htmlFor="terms" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
+                          I agree to the{" "}
+                          <Link
+                            href="/terms"
+                            className="text-indigo-600 hover:text-indigo-800 font-semibold underline decoration-2 underline-offset-2"
+                          >
+                            Terms of Service
+                          </Link>{" "}
+                          and{" "}
+                          <Link
+                            href="/privacy"
+                            className="text-indigo-600 hover:text-indigo-800 font-semibold underline decoration-2 underline-offset-2"
+                          >
+                            Privacy Policy
+                          </Link>
+                        </Label>
+                        {errors.agreeToTerms && (
+                          <p className="text-sm text-red-600 flex items-center">
+                            <span className="w-1 h-1 bg-red-600 rounded-full mr-2"></span>
+                            {errors.agreeToTerms}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleSendOTP}
+                  disabled={loading}
+                  className="w-full h-14 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+                      Sending Magic Code...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="mr-3 h-6 w-6" />
+                      Send Verification Code
+                    </>
+                  )}
+                </Button>
+              </>
+            ) : (
+              <>
+                {/* Step 2: OTP Verification */}
+                <div className="space-y-6">
+                  <div className="text-center space-y-4">
+                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto">
+                      <Shield className="h-10 w-10 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-800 mb-2">Check Your Messages</h3>
+                      <p className="text-gray-600">We've sent a 6-digit verification code to</p>
+                      <p className="font-semibold text-indigo-600 text-lg">{formData.phone}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label htmlFor="otp" className="text-sm font-semibold text-gray-700 text-center block">
+                      Enter Verification Code
+                    </Label>
+                    <Input
+                      id="otp"
+                      type="text"
+                      placeholder="• • • • • •"
+                      value={formData.otp}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "").slice(0, 6)
+                        handleInputChange("otp", value)
+                      }}
+                      className={`text-center text-2xl font-bold h-16 rounded-xl border-2 tracking-widest ${
+                        errors.otp
+                          ? "border-red-400 focus:border-red-500 bg-red-50"
+                          : "border-gray-200 focus:border-indigo-500 hover:border-gray-300"
+                      }`}
+                      maxLength={6}
+                      autoComplete="one-time-code"
+                    />
+                    {errors.otp && (
+                      <p className="text-sm text-red-600 text-center flex items-center justify-center">
+                        <span className="w-1 h-1 bg-red-600 rounded-full mr-2"></span>
+                        {errors.otp}
+                      </p>
+                    )}
+                  </div>
+
+                  <Alert className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
+                    <AlertDescription className="text-sm text-blue-800 text-center">
+                      <strong>Didn't receive the code?</strong> Check your messages or wait a moment before requesting a
+                      new one.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
+                <div className="space-y-4">
+                  <Button
+                    onClick={handleVerifyOTP}
+                    disabled={loading || formData.otp.length !== 6}
+                    className="w-full h-14 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:transform-none"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+                        Creating Your Account...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-3 h-6 w-6" />
+                        Complete Registration
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={handleSendOTP}
+                    disabled={loading}
+                    className="w-full h-12 border-2 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 bg-transparent rounded-xl font-medium transition-all duration-200"
+                  >
+                    Resend Code
+                  </Button>
+                </div>
+              </>
+            )}
+
+            <div className="text-center pt-6 border-t border-gray-100">
+              <p className="text-gray-600">
+                Already have an account?{" "}
+                <Link
+                  href="/login"
+                  className="text-indigo-600 hover:text-indigo-800 font-semibold underline decoration-2 underline-offset-2"
+                >
+                  Sign in here
+                </Link>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
