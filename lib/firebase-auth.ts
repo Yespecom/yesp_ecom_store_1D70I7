@@ -29,10 +29,6 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
     // Create reCAPTCHA verifier
     const recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
 
-    if (!recaptchaVerifier) {
-      throw new Error("Failed to create reCAPTCHA verifier")
-    }
-
     // Send OTP via Firebase
     const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier)
 
@@ -47,58 +43,6 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
 
     if (error.code === "auth/captcha-check-failed") {
       errorMessage = "Security verification failed. Please ensure you're accessing from an authorized domain."
-    } else if (error.code === "auth/invalid-phone-number") {
-      errorMessage = "Invalid phone number format"
-    } else if (error.code === "auth/too-many-requests") {
-      errorMessage = "Too many requests. Please try again later."
-    } else if (error.message) {
-      errorMessage = error.message
-    }
-
-    return {
-      success: false,
-      error: errorMessage,
-    }
-  }
-}
-
-export const resendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPResult> => {
-  try {
-    console.log("🔄 Resending OTP via Firebase to:", phoneNumber)
-
-    if (!auth) {
-      throw new Error("Firebase auth not initialized")
-    }
-
-    // Clear existing reCAPTCHA and create new one
-    const container = document.getElementById("recaptcha-container")
-    if (container) {
-      container.innerHTML = ""
-    }
-
-    // Create new reCAPTCHA verifier for resend
-    const recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
-
-    if (!recaptchaVerifier) {
-      throw new Error("Failed to create reCAPTCHA verifier for resend")
-    }
-
-    // Send OTP via Firebase
-    const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier)
-
-    console.log("✅ OTP resent successfully")
-
-    return {
-      success: true,
-      confirmationResult,
-    }
-  } catch (error: any) {
-    console.error("❌ Error resending Firebase OTP:", error)
-
-    let errorMessage = "Failed to resend OTP"
-
-    if (error.code === "auth/captcha-check-failed") {
-      errorMessage = "Security verification failed. Please complete the reCAPTCHA."
     } else if (error.code === "auth/invalid-phone-number") {
       errorMessage = "Invalid phone number format"
     } else if (error.code === "auth/too-many-requests") {
