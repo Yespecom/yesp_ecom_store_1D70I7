@@ -166,7 +166,7 @@ export default function RootLayout({
         <ChunkErrorHandler />
         <CartProvider>
           <WishlistProvider>
-            <Header />
+         
             {children}
             <Toaster />
           </WishlistProvider>
