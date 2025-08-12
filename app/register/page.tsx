@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -13,11 +13,14 @@ import { Loader2, ArrowLeft, Phone, Mail, User, Shield, Sparkles } from "lucide-
 import { toast } from "sonner"
 import { sendFirebaseOTP, verifyFirebaseOTP, cleanupFirebaseAuth } from "@/lib/firebase-auth"
 import { formatPhoneNumber, validatePhoneNumber } from "@/lib/otp-auth"
+import { Recaptcha, type RecaptchaRef } from "@/components/ui/recaptcha"
 
 export default function RegisterPage() {
   const router = useRouter()
+  const recaptchaRef = useRef<RecaptchaRef>(null)
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -59,8 +62,26 @@ export default function RegisterPage() {
       newErrors.agreeToTerms = "You must agree to the terms and conditions"
     }
 
+    if (!recaptchaToken) {
+      newErrors.recaptcha = "Please complete the security verification"
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
+  }
+
+  const handleRecaptchaVerify = (token: string) => {
+    console.log("reCAPTCHA v3 verified:", token.substring(0, 20) + "...")
+    setRecaptchaToken(token)
+    if (errors.recaptcha) {
+      setErrors((prev) => ({ ...prev, recaptcha: "" }))
+    }
+  }
+
+  const handleRecaptchaError = (error: string) => {
+    console.error("reCAPTCHA error:", error)
+    setRecaptchaToken(null)
+    setErrors((prev) => ({ ...prev, recaptcha: error }))
   }
 
   const handleSendOTP = async () => {
@@ -104,6 +125,7 @@ export default function RegisterPage() {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        recaptchaToken: recaptchaToken,
       })
 
       console.log("✅ Registration successful:", result)
@@ -134,12 +156,15 @@ export default function RegisterPage() {
     cleanupFirebaseAuth()
   }
 
+  // Get reCAPTCHA site key from environment
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-white to-gray-100">
         <div className="absolute inset-0 opacity-5">
-          <Image src="/images/auth-bg.png" alt="Background" fill className="object-cover" />
+          <Image src="/placeholder.svg?height=1080&width=1920" alt="Background" fill className="object-cover" />
         </div>
       </div>
 
@@ -151,7 +176,7 @@ export default function RegisterPage() {
         <div className="hidden lg:flex lg:w-1/2 bg-black relative overflow-hidden">
           <div className="absolute inset-0">
             <Image
-              src="/images/fashion-collage.png"
+              src="/placeholder.svg?height=1080&width=720"
               alt="Fashion Collection"
               fill
               className="object-cover opacity-80"
@@ -162,7 +187,13 @@ export default function RegisterPage() {
           <div className="relative z-10 flex flex-col justify-between p-12 text-white">
             <div>
               <div className="flex items-center space-x-3 mb-8">
-                <Image src="/images/oneofwun-logo.png" alt="OneofWun" width={40} height={40} className="rounded-lg" />
+                <Image
+                  src="/placeholder.svg?height=40&width=40"
+                  alt="OneofWun"
+                  width={40}
+                  height={40}
+                  className="rounded-lg"
+                />
                 <span className="text-2xl font-bold">OneofWun</span>
               </div>
             </div>
@@ -187,7 +218,13 @@ export default function RegisterPage() {
             {/* Mobile logo */}
             <div className="lg:hidden text-center mb-8">
               <div className="flex items-center justify-center space-x-3 mb-4">
-                <Image src="/images/oneofwun-logo.png" alt="OneofWun" width={32} height={32} className="rounded-lg" />
+                <Image
+                  src="/placeholder.svg?height=32&width=32"
+                  alt="OneofWun"
+                  width={32}
+                  height={32}
+                  className="rounded-lg"
+                />
                 <span className="text-xl font-bold text-gray-900">OneofWun</span>
               </div>
             </div>
@@ -283,6 +320,19 @@ export default function RegisterPage() {
                           />
                         </div>
                         {errors.phone && <p className="text-sm text-red-600">{errors.phone}</p>}
+                      </div>
+
+                      {/* reCAPTCHA v3 */}
+                      <div className="space-y-2">
+                        <Recaptcha
+                          ref={recaptchaRef}
+                          siteKey={recaptchaSiteKey}
+                          onVerify={handleRecaptchaVerify}
+                          onError={handleRecaptchaError}
+                          action="register"
+                          size="invisible"
+                        />
+                        {errors.recaptcha && <p className="text-sm text-red-600">{errors.recaptcha}</p>}
                       </div>
 
                       <div className="flex items-start space-x-3 pt-2">
