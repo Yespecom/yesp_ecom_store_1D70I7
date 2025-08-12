@@ -96,6 +96,7 @@ export default function LoginPage() {
         otp: formData.otp,
         purpose: "login",
         rememberMe: formData.rememberMe,
+        recaptchaToken, // Pass the recaptcha token for verification too
       })
 
       if (response.token && response.customer) {
@@ -314,6 +315,7 @@ export default function LoginPage() {
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm text-gray-600">OTP sent to:</p>
                     <p className="font-medium text-gray-900">{formData.phone}</p>
+                    <p className="text-xs text-gray-500 mt-1">Check your SMS messages for the 6-digit code</p>
                   </div>
 
                   {/* OTP Field */}
@@ -334,6 +336,7 @@ export default function LoginPage() {
                         maxLength={6}
                       />
                     </div>
+                    <p className="text-xs text-gray-500">Enter the 6-digit code from your SMS</p>
                   </div>
 
                   {/* Action Buttons */}
