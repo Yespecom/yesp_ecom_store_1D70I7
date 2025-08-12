@@ -76,8 +76,8 @@ export const verifyFirebaseOTP = async (
 
     console.log("✅ Firebase OTP verified, sending to server...")
 
-    // Send to your existing verify-otp endpoint with Firebase token
-    const response = await fetch("https://api.yespstudio.com/api/1D70I7/verify-otp", {
+    // Try the correct API endpoint
+    const response = await fetch("https://api.yespstudio.com/api/1D70I7/otp/verify-otp", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
