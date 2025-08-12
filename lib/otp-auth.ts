@@ -1,49 +1,40 @@
 "use client"
 
-// Phone number validation
+// Phone number validation and formatting utilities
 export const isValidE164Phone = (phone: string): boolean => {
   // E.164 format: +[country code][number]
   const e164Regex = /^\+[1-9]\d{1,14}$/
   return e164Regex.test(phone)
 }
 
-// Format phone number for display
 export const formatPhoneForDisplay = (phone: string): string => {
-  if (!phone) return ""
-
-  // Remove + and format for display
-  const cleaned = phone.replace(/\D/g, "")
-
-  if (cleaned.length >= 10) {
-    // Format as: +XX XXXXX XXXXX
-    const countryCode = cleaned.slice(0, -10)
-    const number = cleaned.slice(-10)
-    const formatted = number.replace(/(\d{5})(\d{5})/, "$1 $2")
-    return `+${countryCode} ${formatted}`
+  // Remove the + and format for display
+  if (phone.startsWith("+")) {
+    const cleaned = phone.substring(1)
+    if (cleaned.length >= 10) {
+      // Format as: +XX XXXXX XXXXX
+      const countryCode = cleaned.substring(0, cleaned.length - 10)
+      const number = cleaned.substring(cleaned.length - 10)
+      const part1 = number.substring(0, 5)
+      const part2 = number.substring(5)
+      return `+${countryCode} ${part1} ${part2}`
+    }
   }
-
   return phone
 }
 
-// Mask phone number for security
 export const maskPhoneNumber = (phone: string): string => {
-  if (!phone) return ""
-
-  if (phone.length <= 4) return phone
-
-  const start = phone.slice(0, 3)
-  const end = phone.slice(-2)
-  const middle = "*".repeat(phone.length - 5)
-
-  return `${start}${middle}${end}`
+  if (phone.length < 4) return phone
+  const visible = phone.substring(0, 3) + phone.substring(phone.length - 2)
+  const masked = "*".repeat(phone.length - 5)
+  return visible.substring(0, 3) + masked + visible.substring(3)
 }
 
-// Extract country code from phone number
-export const getCountryCode = (phone: string): string => {
+export const getCountryCodeFromPhone = (phone: string): string => {
   if (!phone.startsWith("+")) return ""
 
   // Common country codes
-  const countryCodes = {
+  const countryCodes: { [key: string]: string } = {
     "+1": "US/CA",
     "+44": "UK",
     "+91": "IN",
@@ -55,8 +46,8 @@ export const getCountryCode = (phone: string): string => {
     "+34": "ES",
     "+7": "RU",
     "+55": "BR",
+    "+52": "MX",
     "+61": "AU",
-    "+27": "ZA",
     "+82": "KR",
     "+65": "SG",
     "+60": "MY",
@@ -66,33 +57,21 @@ export const getCountryCode = (phone: string): string => {
     "+63": "PH",
   }
 
-  // Find matching country code
-  for (const [code, country] of Object.entries(countryCodes)) {
+  // Try to match country codes (longest first)
+  const sortedCodes = Object.keys(countryCodes).sort((a, b) => b.length - a.length)
+
+  for (const code of sortedCodes) {
     if (phone.startsWith(code)) {
-      return country
+      return countryCodes[code]
     }
   }
 
   return "Unknown"
 }
 
-// Debug logging for OTP operations
-export const logOTPOperation = (operation: string, data: any) => {
+// Debug logging utility
+export const logOTPDebug = (message: string, data?: any) => {
   if (process.env.NODE_ENV === "development") {
-    console.log(`🔐 OTP ${operation}:`, data)
+    console.log(`🔐 OTP Debug: ${message}`, data || "")
   }
-}
-
-// Generate a random OTP for testing (development only)
-export const generateTestOTP = (): string => {
-  if (process.env.NODE_ENV !== "development") {
-    throw new Error("Test OTP generation is only available in development")
-  }
-
-  return Math.floor(100000 + Math.random() * 900000).toString()
-}
-
-// Validate OTP format
-export const isValidOTP = (otp: string): boolean => {
-  return /^\d{6}$/.test(otp)
 }
