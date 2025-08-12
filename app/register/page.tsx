@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { sendFirebaseOTP, resendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
+import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
-import { ArrowLeft, User, Mail, Phone, Shield, AlertCircle, RefreshCw } from "lucide-react"
+import { ArrowLeft, User, Mail, Phone, Shield, AlertCircle } from "lucide-react"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -25,25 +25,9 @@ export default function RegisterPage() {
   })
   const [step, setStep] = useState<"details" | "phone" | "otp">("details")
   const [loading, setLoading] = useState(false)
-  const [resendLoading, setResendLoading] = useState(false)
   const [error, setError] = useState("")
-  const [resendTimer, setResendTimer] = useState(0)
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
   const router = useRouter()
-
-  // Start resend timer
-  const startResendTimer = () => {
-    setResendTimer(30)
-    const interval = setInterval(() => {
-      setResendTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-  }
 
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,7 +83,6 @@ export default function RegisterPage() {
       if (result.success && result.confirmationResult) {
         setConfirmationResult(result.confirmationResult)
         setStep("otp")
-        startResendTimer()
         console.log("Firebase OTP sent successfully")
       } else {
         throw new Error(result.error || "Failed to send OTP")
@@ -163,22 +146,17 @@ export default function RegisterPage() {
     setStep("phone")
     setError("")
     setConfirmationResult(null)
-    setResendTimer(0)
   }
 
   const handleResendOtp = async () => {
-    if (resendTimer > 0) return
-
-    setResendLoading(true)
+    setLoading(true)
     setError("")
 
     try {
-      console.log("Resending Firebase OTP...")
-      const result = await resendFirebaseOTP(formData.phone)
+      const result = await sendFirebaseOTP(formData.phone)
 
       if (result.success && result.confirmationResult) {
         setConfirmationResult(result.confirmationResult)
-        startResendTimer()
         setError("OTP resent successfully!")
         setTimeout(() => setError(""), 3000)
       } else {
@@ -188,7 +166,7 @@ export default function RegisterPage() {
       console.error("Firebase OTP resend failed:", error)
       setError(error.message || "Failed to resend OTP")
     } finally {
-      setResendLoading(false)
+      setLoading(false)
     }
   }
 
@@ -528,18 +506,9 @@ export default function RegisterPage() {
                         onClick={handleResendOtp}
                         variant="outline"
                         className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
-                        disabled={resendLoading || resendTimer > 0}
+                        disabled={loading}
                       >
-                        {resendLoading ? (
-                          <div className="flex items-center">
-                            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                            Resending...
-                          </div>
-                        ) : resendTimer > 0 ? (
-                          `Resend in ${resendTimer}s`
-                        ) : (
-                          "Resend Code"
-                        )}
+                        Resend Code
                       </Button>
                     </div>
                   </div>
