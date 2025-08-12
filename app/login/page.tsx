@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -10,8 +10,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { requestPhoneOtp, verifyPhoneOtp, isValidE164Phone } from "@/lib/otp-auth"
+import {
+  requestPhoneOtp,
+  verifyPhoneOtp,
+  isValidE164Phone,
+  loadRecaptchaScript,
+  executeRecaptcha,
+} from "@/lib/otp-auth"
 import { ArrowLeft, Phone, Shield } from "lucide-react"
+
+const RECAPTCHA_SITE_KEY = "6LfemqMrAAAAAKPE4E9SMFcRZKolPLp7N4jiearD" // This is a test key, replace with your actual key
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -23,7 +31,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [otpSent, setOtpSent] = useState(false)
+  const [recaptchaLoaded, setRecaptchaLoaded] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    loadRecaptchaScript()
+      .then(() => setRecaptchaLoaded(true))
+      .catch((error) => {
+        console.error("Failed to load reCAPTCHA:", error)
+        setError("Failed to load security verification. Please refresh the page.")
+      })
+  }, [])
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,17 +55,30 @@ export default function LoginPage() {
       return
     }
 
+    if (!recaptchaLoaded) {
+      setError("Security verification not ready. Please wait a moment and try again.")
+      setLoading(false)
+      return
+    }
+
     try {
+      const recaptchaToken = await executeRecaptcha(RECAPTCHA_SITE_KEY, "send_otp")
+
       await requestPhoneOtp({
         phone: formData.phone,
         purpose: "login",
         channel: "sms",
+        recaptchaToken, // Include reCAPTCHA token
       })
       setOtpSent(true)
       setStep("otp")
     } catch (error: any) {
       console.error("OTP request failed:", error)
-      setError(error.message || "Failed to send OTP")
+      if (error.message?.includes("reCAPTCHA")) {
+        setError("Security verification failed. Please refresh the page and try again.")
+      } else {
+        setError(error.message || "Failed to send OTP")
+      }
     } finally {
       setLoading(false)
     }
@@ -87,6 +118,40 @@ export default function LoginPage() {
     setStep("phone")
     setOtpSent(false)
     setError("")
+  }
+
+  const handleResendOtp = async () => {
+    if (!recaptchaLoaded) {
+      setError("Security verification not ready. Please wait a moment and try again.")
+      return
+    }
+
+    setLoading(true)
+    setError("")
+
+    try {
+      const recaptchaToken = await executeRecaptcha(RECAPTCHA_SITE_KEY, "resend_otp")
+
+      await requestPhoneOtp({
+        phone: formData.phone,
+        purpose: "login",
+        channel: "sms",
+        recaptchaToken,
+      })
+      setError("")
+      // Show success message briefly
+      setError("OTP resent successfully!")
+      setTimeout(() => setError(""), 3000)
+    } catch (error: any) {
+      console.error("OTP resend failed:", error)
+      if (error.message?.includes("reCAPTCHA")) {
+        setError("Security verification failed. Please refresh the page and try again.")
+      } else {
+        setError(error.message || "Failed to resend OTP")
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -154,8 +219,18 @@ export default function LoginPage() {
 
             <CardContent className="space-y-6">
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm flex items-center">
-                  <div className="w-2 h-2 bg-red-500 rounded-full mr-3"></div>
+                <div
+                  className={`border px-4 py-3 rounded-lg text-sm flex items-center ${
+                    error.includes("successfully")
+                      ? "bg-green-50 border-green-200 text-green-600"
+                      : "bg-red-50 border-red-200 text-red-600"
+                  }`}
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full mr-3 ${
+                      error.includes("successfully") ? "bg-green-500" : "bg-red-500"
+                    }`}
+                  ></div>
                   {error}
                 </div>
               )}
@@ -199,13 +274,15 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                    disabled={loading}
+                    disabled={loading || !recaptchaLoaded}
                   >
                     {loading ? (
                       <div className="flex items-center">
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                         Sending OTP...
                       </div>
+                    ) : !recaptchaLoaded ? (
+                      "Loading security verification..."
                     ) : (
                       "Send OTP"
                     )}
@@ -269,10 +346,10 @@ export default function LoginPage() {
                       </Button>
                       <Button
                         type="button"
-                        onClick={handleSendOtp}
+                        onClick={handleResendOtp}
                         variant="outline"
                         className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
-                        disabled={loading}
+                        disabled={loading || !recaptchaLoaded}
                       >
                         Resend OTP
                       </Button>
