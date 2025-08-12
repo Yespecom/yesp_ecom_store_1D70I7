@@ -53,6 +53,7 @@ async function parseError(res: Response): Promise<ErrorWithCode> {
   let bodyText = ""
   try {
     bodyText = await res.text()
+    console.log("Error response body:", bodyText)
     const json = bodyText ? JSON.parse(bodyText) : null
     const msg = json?.message || json?.error || res.statusText || "Request failed"
     err.message = msg
@@ -115,7 +116,13 @@ export async function requestPhoneOtp(params: {
     requestBody.name = name.trim()
   }
 
-  console.log("Sending OTP request:", { phone, purpose, hasRecaptcha: !!recaptchaToken })
+  console.log("Sending OTP request:", {
+    url,
+    phone,
+    purpose,
+    hasRecaptcha: !!recaptchaToken,
+    recaptchaLength: recaptchaToken?.length,
+  })
 
   const res = await fetch(url, {
     method: "POST",
@@ -142,9 +149,8 @@ export async function verifyPhoneOtp(params: {
   name?: string
   rememberMe?: boolean
   storeId?: string
-  recaptchaToken?: string
 }): Promise<OtpVerifySuccess> {
-  const { phone, otp, purpose = "login", name, rememberMe = true, storeId = STORE_ID, recaptchaToken } = params
+  const { phone, otp, purpose = "login", name, rememberMe = true, storeId = STORE_ID } = params
   const url = `${OTP_DOMAIN}/api/${storeId}/firebase-otp/verify-otp`
 
   // Validate required parameters
@@ -168,12 +174,13 @@ export async function verifyPhoneOtp(params: {
     requestBody.name = name.trim()
   }
 
-  // Add recaptcha token if provided (some APIs might require it for verification too)
-  if (recaptchaToken && recaptchaToken.trim()) {
-    requestBody.recaptchaToken = recaptchaToken.trim()
-  }
-
-  console.log("Sending OTP verification:", { phone, purpose, hasRecaptcha: !!recaptchaToken, otpLength: otp.length })
+  console.log("Sending OTP verification:", {
+    url,
+    phone,
+    purpose,
+    otpLength: otp.length,
+    requestBody: { ...requestBody, otp: "***" }, // Hide OTP in logs
+  })
 
   const res = await fetch(url, {
     method: "POST",
