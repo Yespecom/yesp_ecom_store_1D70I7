@@ -1,8 +1,5 @@
-"use client"
-
-import { initializeApp, getApps, getApp } from "firebase/app"
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"
-import type { Auth } from "firebase/auth"
+import { initializeApp } from "firebase/app"
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from "firebase/auth"
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,35 +8,57 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
-const auth: Auth = getAuth(app)
+const app = initializeApp(firebaseConfig)
+export const auth = getAuth(app)
 
-// Set language code for SMS
-auth.languageCode = "en"
+// Global variable to track current verifier
+let currentVerifier: RecaptchaVerifier | null = null
 
-// Create reCAPTCHA verifier
-export const createRecaptchaVerifier = (containerId: string) => {
-  if (typeof window === "undefined") return null
+// Create reCAPTCHA verifier with proper cleanup
+export const createRecaptchaVerifier = (containerId = "recaptcha-container") => {
+  // Clear any existing verifier
+  if (currentVerifier) {
+    try {
+      currentVerifier.clear()
+    } catch (error) {
+      console.log("Previous verifier already cleared")
+    }
+    currentVerifier = null
+  }
 
-  // Clear any existing reCAPTCHA
+  // Clear the container
   const container = document.getElementById(containerId)
   if (container) {
     container.innerHTML = ""
   }
 
-  return new RecaptchaVerifier(auth, containerId, {
-    size: "normal",
-    callback: (response: any) => {
-      console.log("reCAPTCHA solved:", response)
+  // Create new verifier
+  currentVerifier = new RecaptchaVerifier(auth, containerId, {
+    size: "invisible",
+    callback: (response: string) => {
+      console.log("✅ reCAPTCHA solved:", response.substring(0, 20) + "...")
     },
     "expired-callback": () => {
-      console.log("reCAPTCHA expired")
+      console.log("❌ reCAPTCHA expired")
     },
   })
+
+  return currentVerifier
 }
 
-export { auth, signInWithPhoneNumber }
-export default app
+// Clear current verifier
+export const clearRecaptchaVerifier = () => {
+  if (currentVerifier) {
+    try {
+      currentVerifier.clear()
+    } catch (error) {
+      console.log("Verifier already cleared")
+    }
+    currentVerifier = null
+  }
+}
+
+export { signInWithPhoneNumber, type ConfirmationResult }
