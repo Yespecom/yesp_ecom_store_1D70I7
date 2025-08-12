@@ -64,6 +64,7 @@ export const verifyFirebaseOTP = async (
   phone: string,
   purpose: string,
   name?: string,
+  email?: string,
 ): Promise<FirebaseVerifyResult> => {
   try {
     console.log("🔍 Verifying Firebase OTP...")
@@ -76,6 +77,9 @@ export const verifyFirebaseOTP = async (
 
     console.log("✅ Firebase OTP verified, sending to server...")
 
+    // Generate email if not provided (required by server)
+    const userEmail = email || `${phone.replace("+", "")}@temp.oneofwun.com`
+
     // Send to the correct Firebase OTP endpoint
     const response = await fetch("https://api.yespstudio.com/api/1D70I7/firebase-otp/verify-otp", {
       method: "POST",
@@ -86,7 +90,8 @@ export const verifyFirebaseOTP = async (
         phone: phone,
         otp: "FIREBASE_VERIFIED", // Special marker to indicate Firebase verification
         purpose: purpose,
-        name: name,
+        name: name || "User", // Provide default name if not given
+        email: userEmail, // Required by server
         firebaseIdToken: idToken, // Include Firebase ID token for server verification
         firebaseVerified: true, // Flag to indicate this came from Firebase
       }),
