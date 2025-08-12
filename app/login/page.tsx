@@ -75,11 +75,13 @@ export default function LoginPage() {
         formData.phone,
         "login",
         undefined, // name not required for login
-        undefined, // email not required for login, will be auto-generated
+        undefined, // email not required for login, will be handled by server
       )
 
       if (result.success && result.token && result.customer) {
         console.log("Login successful")
+        console.log("Customer data:", result.customer)
+
         // Store authentication data
         localStorage.setItem("auth_token", result.token)
         localStorage.setItem("user_data", JSON.stringify(result.customer))
