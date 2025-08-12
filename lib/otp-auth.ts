@@ -115,6 +115,8 @@ export async function requestPhoneOtp(params: {
     requestBody.name = name.trim()
   }
 
+  console.log("Sending OTP request:", { phone, purpose, hasRecaptcha: !!recaptchaToken })
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -129,6 +131,7 @@ export async function requestPhoneOtp(params: {
   }
 
   const data = (await res.json()) as OtpRequestSuccess
+  console.log("OTP request successful:", data)
   return data
 }
 
@@ -139,8 +142,9 @@ export async function verifyPhoneOtp(params: {
   name?: string
   rememberMe?: boolean
   storeId?: string
+  recaptchaToken?: string
 }): Promise<OtpVerifySuccess> {
-  const { phone, otp, purpose = "login", name, rememberMe = true, storeId = STORE_ID } = params
+  const { phone, otp, purpose = "login", name, rememberMe = true, storeId = STORE_ID, recaptchaToken } = params
   const url = `${OTP_DOMAIN}/api/${storeId}/firebase-otp/verify-otp`
 
   // Validate required parameters
@@ -164,6 +168,13 @@ export async function verifyPhoneOtp(params: {
     requestBody.name = name.trim()
   }
 
+  // Add recaptcha token if provided (some APIs might require it for verification too)
+  if (recaptchaToken && recaptchaToken.trim()) {
+    requestBody.recaptchaToken = recaptchaToken.trim()
+  }
+
+  console.log("Sending OTP verification:", { phone, purpose, hasRecaptcha: !!recaptchaToken, otpLength: otp.length })
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -174,10 +185,13 @@ export async function verifyPhoneOtp(params: {
   })
 
   if (!res.ok) {
-    throw await parseError(res)
+    const error = await parseError(res)
+    console.error("OTP verification failed:", error)
+    throw error
   }
 
   const data = (await res.json()) as OtpVerifySuccess
+  console.log("OTP verification successful:", data)
   return data
 }
 
