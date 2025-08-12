@@ -1,242 +1,88 @@
-const OTP_DOMAIN = "https://api.yespstudio.com"
-export const STORE_ID = "1D70I7"
-const OTP_BASE = `${OTP_DOMAIN}/api/${STORE_ID}/firebase-otp`
+"use client"
 
-export type OtpPurpose = "login" | "registration"
-export type OtpChannel = "sms" | "call"
+// Phone number validation
+export const isValidE164Phone = (phone: string): boolean => {
+  const e164Regex = /^\+[1-9]\d{1,14}$/
+  return e164Regex.test(phone)
+}
 
-export interface OtpRequestSuccess {
-  message: string
-  provider: "firebase" | "twilio-verify" | "sms" | "fast2sms" | string
-  purpose: OtpPurpose
-  status?: "pending" | "sent" | string
-  expiresIn?: string
-  dev?: {
-    code?: string
+// Format phone number for display
+export const formatPhoneNumber = (phone: string): string => {
+  if (!phone) return ""
+
+  // Remove all non-digit characters except +
+  const cleaned = phone.replace(/[^\d+]/g, "")
+
+  // Ensure it starts with +
+  if (!cleaned.startsWith("+")) {
+    return `+${cleaned}`
   }
+
+  return cleaned
 }
 
-export interface TokenInfo {
-  issuedAt: string
-  expiresAt: string
-  ttlSeconds: number
+// Generate OTP (for testing purposes)
+export const generateOTP = (): string => {
+  return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
-export interface CustomerDTO {
-  id: string
-  name: string
-  email?: string | null
-  phone: string
-  totalSpent?: number
-  totalOrders?: number
-  addresses?: any[]
-  preferences?: Record<string, any>
-  tier?: string
+// Validate OTP format
+export const isValidOTP = (otp: string): boolean => {
+  return /^\d{6}$/.test(otp)
 }
 
-export interface OtpVerifySuccess {
-  message: string
-  method: "phone_otp"
-  token: string
-  customer: CustomerDTO
-  storeId: string
-  tenantId: string
-  tokenInfo?: TokenInfo
-  expiresIn?: string
-}
+// Phone number country codes
+export const countryCodes = [
+  { code: "+1", country: "US/Canada", flag: "🇺🇸" },
+  { code: "+91", country: "India", flag: "🇮🇳" },
+  { code: "+44", country: "UK", flag: "🇬🇧" },
+  { code: "+86", country: "China", flag: "🇨🇳" },
+  { code: "+81", country: "Japan", flag: "🇯🇵" },
+  { code: "+49", country: "Germany", flag: "🇩🇪" },
+  { code: "+33", country: "France", flag: "🇫🇷" },
+  { code: "+39", country: "Italy", flag: "🇮🇹" },
+  { code: "+34", country: "Spain", flag: "🇪🇸" },
+  { code: "+7", country: "Russia", flag: "🇷🇺" },
+  { code: "+55", country: "Brazil", flag: "🇧🇷" },
+  { code: "+52", country: "Mexico", flag: "🇲🇽" },
+  { code: "+61", country: "Australia", flag: "🇦🇺" },
+  { code: "+82", country: "South Korea", flag: "🇰🇷" },
+  { code: "+65", country: "Singapore", flag: "🇸🇬" },
+]
 
-type ErrorWithCode = Error & { code?: string; retryAfter?: number; status?: number }
+// Get country info from phone number
+export const getCountryFromPhone = (phone: string) => {
+  if (!phone.startsWith("+")) return null
 
-async function parseError(res: Response): Promise<ErrorWithCode> {
-  const err: ErrorWithCode = new Error("Request failed")
-  err.status = res.status
-  let bodyText = ""
-  try {
-    bodyText = await res.text()
-    console.log("Error response body:", bodyText)
-    const json = bodyText ? JSON.parse(bodyText) : null
-    const msg = json?.message || json?.error || res.statusText || "Request failed"
-    err.message = msg
-    if (json?.code && typeof json.code === "string") {
-      err.code = json.code
-    } else {
-      // Map common statuses to codes if backend doesn't send code
-      if (res.status === 400) err.code = "BAD_REQUEST"
-      if (res.status === 401) err.code = "UNAUTHORIZED"
-      if (res.status === 404) err.code = "NOT_FOUND"
-      if (res.status === 429) err.code = "OTP_RATE_LIMIT_EXCEEDED"
-      if (res.status >= 500) err.code = "SERVER_ERROR"
+  // Sort by code length (longest first) to match more specific codes first
+  const sortedCodes = countryCodes.sort((a, b) => b.code.length - a.code.length)
+
+  for (const country of sortedCodes) {
+    if (phone.startsWith(country.code)) {
+      return country
     }
-  } catch {
-    // Non-JSON error payloads (e.g. HTML 404 page)
-    err.message = bodyText || res.statusText || `HTTP ${res.status}`
-    if (res.status === 404) err.code = "NOT_FOUND"
   }
-  const retryAfter = res.headers.get("Retry-After")
-  if (retryAfter) {
-    const sec = Number.parseInt(retryAfter, 10)
-    if (!Number.isNaN(sec)) err.retryAfter = sec
-  }
-  return err
+
+  return null
 }
 
-export function isValidE164Phone(input: string): boolean {
-  // E.164 allows up to 15 digits. We'll accept 8-15 for practical purposes.
-  return /^\+[1-9]\d{7,14}$/.test(input.trim())
+// Mask phone number for display
+export const maskPhoneNumber = (phone: string): string => {
+  if (!phone || phone.length < 4) return phone
+
+  const country = getCountryFromPhone(phone)
+  if (!country) return phone
+
+  const number = phone.substring(country.code.length)
+  if (number.length <= 4) return phone
+
+  const masked = number.substring(0, 2) + "*".repeat(number.length - 4) + number.substring(number.length - 2)
+  return country.code + masked
 }
 
-export async function requestPhoneOtp(params: {
-  phone: string
-  purpose?: OtpPurpose
-  channel?: OtpChannel
-  storeId?: string
-  name?: string
-  recaptchaToken?: string
-}): Promise<OtpRequestSuccess> {
-  const { phone, purpose = "login", channel = "sms", storeId = STORE_ID, name, recaptchaToken } = params
-  const url = `${OTP_DOMAIN}/api/${storeId}/firebase-otp/send-otp`
-
-  // Validate required parameters
-  if (!phone || !phone.trim()) {
-    throw new Error("Phone number is required")
-  }
-
-  if (!recaptchaToken || !recaptchaToken.trim()) {
-    throw new Error("reCAPTCHA token is required")
-  }
-
-  const requestBody: any = {
-    phone: phone.trim(),
-    purpose,
-    recaptchaToken: recaptchaToken.trim(),
-  }
-
-  // Add name for registration
-  if (purpose === "registration" && name) {
-    requestBody.name = name.trim()
-  }
-
-  console.log("Sending OTP request:", {
-    url,
-    phone,
-    purpose,
-    hasRecaptcha: !!recaptchaToken,
-    recaptchaLength: recaptchaToken?.length,
-  })
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  })
-
-  if (!res.ok) {
-    throw await parseError(res)
-  }
-
-  const data = (await res.json()) as OtpRequestSuccess
-  console.log("OTP request successful:", data)
-  return data
-}
-
-export async function verifyPhoneOtp(params: {
-  phone: string
-  otp: string
-  purpose?: OtpPurpose
-  name?: string
-  rememberMe?: boolean
-  storeId?: string
-}): Promise<OtpVerifySuccess> {
-  const { phone, otp, purpose = "login", name, rememberMe = true, storeId = STORE_ID } = params
-  const url = `${OTP_DOMAIN}/api/${storeId}/firebase-otp/verify-otp`
-
-  // Validate required parameters
-  if (!phone || !phone.trim()) {
-    throw new Error("Phone number is required")
-  }
-
-  if (!otp || !otp.trim()) {
-    throw new Error("OTP is required")
-  }
-
-  const requestBody: any = {
-    phone: phone.trim(),
-    otp: otp.trim(),
-    purpose,
-    rememberMe,
-  }
-
-  // Add name for registration
-  if (purpose === "registration" && name) {
-    requestBody.name = name.trim()
-  }
-
-  console.log("Sending OTP verification:", {
-    url,
-    phone,
-    purpose,
-    otpLength: otp.length,
-    requestBody: { ...requestBody, otp: "***" }, // Hide OTP in logs
-  })
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  })
-
-  if (!res.ok) {
-    const error = await parseError(res)
-    console.error("OTP verification failed:", error)
-    throw error
-  }
-
-  const data = (await res.json()) as OtpVerifySuccess
-  console.log("OTP verification successful:", data)
-  return data
-}
-
-export function loadRecaptchaScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (typeof window !== "undefined" && window.grecaptcha) {
-      resolve()
-      return
-    }
-
-    const script = document.createElement("script")
-    script.src = "https://www.google.com/recaptcha/api.js"
-    script.async = true
-    script.defer = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error("Failed to load reCAPTCHA"))
-    document.head.appendChild(script)
-  })
-}
-
-export function executeRecaptcha(siteKey: string, action = "submit"): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === "undefined" || !window.grecaptcha) {
-      reject(new Error("reCAPTCHA not loaded"))
-      return
-    }
-
-    window.grecaptcha.ready(() => {
-      window.grecaptcha.execute(siteKey, { action }).then(resolve).catch(reject)
-    })
-  })
-}
-
-declare global {
-  interface Window {
-    grecaptcha: {
-      ready: (callback: () => void) => void
-      execute: (siteKey: string, options: { action: string }) => Promise<string>
-    }
+// Debug logging
+export const logOTPDebug = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[OTP Debug] ${message}`, data || "")
   }
 }
