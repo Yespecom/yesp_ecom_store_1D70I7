@@ -33,10 +33,10 @@ export const createRecaptchaVerifier = (containerId: string) => {
   return new RecaptchaVerifier(auth, containerId, {
     size: "normal",
     callback: (response: any) => {
-      console.log("✅ reCAPTCHA solved:", response)
+      console.log("reCAPTCHA solved:", response)
     },
     "expired-callback": () => {
-      console.log("❌ reCAPTCHA expired")
+      console.log("reCAPTCHA expired")
     },
   })
 }
