@@ -90,8 +90,9 @@ export async function requestPhoneOtp(params: {
   channel?: OtpChannel
   storeId?: string
   name?: string
+  recaptchaToken?: string
 }): Promise<OtpRequestSuccess> {
-  const { phone, purpose = "login", channel = "sms", storeId = STORE_ID, name } = params
+  const { phone, purpose = "login", channel = "sms", storeId = STORE_ID, name, recaptchaToken } = params
   const url = `${OTP_DOMAIN}/api/${storeId}/firebase-otp/send-otp`
 
   const requestBody: any = {
@@ -102,6 +103,10 @@ export async function requestPhoneOtp(params: {
   // Add name for registration
   if (purpose === "registration" && name) {
     requestBody.name = name
+  }
+
+  if (recaptchaToken) {
+    requestBody.recaptchaToken = recaptchaToken
   }
 
   const res = await fetch(url, {
@@ -159,4 +164,43 @@ export async function verifyPhoneOtp(params: {
 
   const data = (await res.json()) as OtpVerifySuccess
   return data
+}
+
+export function loadRecaptchaScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== "undefined" && window.grecaptcha) {
+      resolve()
+      return
+    }
+
+    const script = document.createElement("script")
+    script.src = "https://www.google.com/recaptcha/api.js"
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error("Failed to load reCAPTCHA"))
+    document.head.appendChild(script)
+  })
+}
+
+export function executeRecaptcha(siteKey: string, action = "submit"): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined" || !window.grecaptcha) {
+      reject(new Error("reCAPTCHA not loaded"))
+      return
+    }
+
+    window.grecaptcha.ready(() => {
+      window.grecaptcha.execute(siteKey, { action }).then(resolve).catch(reject)
+    })
+  })
+}
+
+declare global {
+  interface Window {
+    grecaptcha: {
+      ready: (callback: () => void) => void
+      execute: (siteKey: string, options: { action: string }) => Promise<string>
+    }
+  }
 }
