@@ -77,8 +77,25 @@ export const verifyFirebaseOTP = async (
 
     console.log("✅ Firebase OTP verified, sending to server...")
 
-    // Generate email if not provided (required by server)
-    const userEmail = email || `${phone.replace("+", "")}@temp.oneofwun.com`
+    // For login, don't generate temporary email - let server handle existing account
+    const payload: any = {
+      phone: phone,
+      otp: "FIREBASE_VERIFIED", // Special marker to indicate Firebase verification
+      purpose: purpose,
+      firebaseIdToken: idToken, // Include Firebase ID token for server verification
+      firebaseVerified: true, // Flag to indicate this came from Firebase
+    }
+
+    // Only add name and email for registration
+    if (purpose === "registration") {
+      payload.name = name || "User"
+      payload.email = email || `${phone.replace("+", "")}@temp.oneofwun.com`
+    } else {
+      // For login, let the server find the existing account by phone
+      payload.name = name || "User" // Provide fallback name
+    }
+
+    console.log("📤 Sending payload to server:", payload)
 
     // Send to the correct Firebase OTP endpoint
     const response = await fetch("https://api.yespstudio.com/api/1D70I7/firebase-otp/verify-otp", {
@@ -86,25 +103,33 @@ export const verifyFirebaseOTP = async (
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        phone: phone,
-        otp: "FIREBASE_VERIFIED", // Special marker to indicate Firebase verification
-        purpose: purpose,
-        name: name || "User", // Provide default name if not given
-        email: userEmail, // Required by server
-        firebaseIdToken: idToken, // Include Firebase ID token for server verification
-        firebaseVerified: true, // Flag to indicate this came from Firebase
-      }),
+      body: JSON.stringify(payload),
     })
 
     const data = await response.json()
+    console.log("📥 Server response:", data)
 
     if (response.ok) {
       console.log("✅ Server verification successful:", data)
+
+      // Extract customer data properly
+      let customer = data.customer || data.user
+
+      // If customer has temporary email, try to get real data from server response
+      if (customer && customer.email && customer.email.includes("@temp.oneofwun.com")) {
+        console.log("🔄 Customer has temporary email, checking for real data...")
+
+        // If this is a login and we have better customer data in the response
+        if (purpose === "login" && data.existingCustomer) {
+          customer = data.existingCustomer
+          console.log("✅ Using existing customer data:", customer)
+        }
+      }
+
       return {
         success: true,
         token: data.token,
-        customer: data.customer || data.user,
+        customer: customer,
       }
     } else {
       throw new Error(data.error || data.message || "Server verification failed")
