@@ -1,4 +1,6 @@
-import { initializeApp, getApps } from "firebase/app"
+"use client"
+
+import { initializeApp, getApps, getApp } from "firebase/app"
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"
 import type { Auth } from "firebase/auth"
 
@@ -12,23 +14,31 @@ const firebaseConfig = {
 }
 
 // Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 const auth: Auth = getAuth(app)
+
+// Set language code for SMS
+auth.languageCode = "en"
 
 // Create reCAPTCHA verifier
 export const createRecaptchaVerifier = (containerId: string) => {
-  if (typeof window !== "undefined") {
-    return new RecaptchaVerifier(auth, containerId, {
-      size: "normal",
-      callback: () => {
-        console.log("reCAPTCHA solved")
-      },
-      "expired-callback": () => {
-        console.log("reCAPTCHA expired")
-      },
-    })
+  if (typeof window === "undefined") return null
+
+  // Clear any existing reCAPTCHA
+  const container = document.getElementById(containerId)
+  if (container) {
+    container.innerHTML = ""
   }
-  throw new Error("RecaptchaVerifier can only be used in browser environment")
+
+  return new RecaptchaVerifier(auth, containerId, {
+    size: "normal",
+    callback: (response: any) => {
+      console.log("✅ reCAPTCHA solved:", response)
+    },
+    "expired-callback": () => {
+      console.log("❌ reCAPTCHA expired")
+    },
+  })
 }
 
 export { auth, signInWithPhoneNumber }
