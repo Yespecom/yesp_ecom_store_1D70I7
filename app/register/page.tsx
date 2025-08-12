@@ -12,11 +12,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
-import { ArrowLeft, Phone, Shield, User, AlertCircle } from "lucide-react"
+import { ArrowLeft, Phone, Shield, User, AlertCircle, Mail } from "lucide-react"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: "",
+    email: "",
     phone: "",
     otp: "",
     acceptTerms: false,
@@ -35,6 +36,12 @@ export default function RegisterPage() {
 
     if (!formData.name.trim()) {
       setError("Please enter your full name")
+      setLoading(false)
+      return
+    }
+
+    if (!formData.email.trim()) {
+      setError("Please enter your email address")
       setLoading(false)
       return
     }
@@ -89,6 +96,7 @@ export default function RegisterPage() {
         formData.phone,
         "registration",
         formData.name,
+        formData.email,
       )
 
       if (result.success && result.token && result.customer) {
@@ -275,6 +283,25 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
+                  {/* Email Field */}
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                      Email Address
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        id="email"
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                        placeholder="Enter your email address"
+                      />
+                    </div>
+                  </div>
+
                   {/* Phone Field */}
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
@@ -363,6 +390,7 @@ export default function RegisterPage() {
                   <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                     <p className="text-sm text-gray-600">Creating account for:</p>
                     <p className="font-medium text-gray-900">{formData.name}</p>
+                    <p className="font-medium text-gray-900">{formData.email}</p>
                     <p className="font-medium text-gray-900">{formData.phone}</p>
                     <p className="text-xs text-green-600 mt-1">✅ Real SMS sent via Firebase</p>
                   </div>
