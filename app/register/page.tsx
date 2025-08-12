@@ -12,51 +12,69 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
-import { ArrowLeft, Phone, Shield, User, AlertCircle, Mail } from "lucide-react"
+import { ArrowLeft, User, Mail, Phone, Shield, AlertCircle } from "lucide-react"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     phone: "",
     otp: "",
     acceptTerms: false,
-    rememberMe: false,
   })
-  const [step, setStep] = useState<"details" | "otp">("details")
+  const [step, setStep] = useState<"details" | "phone" | "otp">("details")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
   const router = useRouter()
 
+  const handleDetailsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+
+    // Validate required fields
+    if (!formData.firstName.trim()) {
+      setError("First name is required")
+      return
+    }
+    if (!formData.lastName.trim()) {
+      setError("Last name is required")
+      return
+    }
+    if (!formData.email.trim()) {
+      setError("Email is required")
+      return
+    }
+    if (!formData.phone.trim()) {
+      setError("Phone number is required")
+      return
+    }
+    if (!formData.acceptTerms) {
+      setError("Please accept the terms and conditions")
+      return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address")
+      return
+    }
+
+    // Validate phone format
+    if (!isValidE164Phone(formData.phone)) {
+      setError("Please enter a valid phone number with country code (e.g., +919876543210)")
+      return
+    }
+
+    setStep("phone")
+  }
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
-
-    if (!formData.name.trim()) {
-      setError("Please enter your full name")
-      setLoading(false)
-      return
-    }
-
-    if (!formData.email.trim()) {
-      setError("Please enter your email address")
-      setLoading(false)
-      return
-    }
-
-    if (!isValidE164Phone(formData.phone)) {
-      setError("Please enter a valid phone number with country code (e.g., +919876543210)")
-      setLoading(false)
-      return
-    }
-
-    if (!formData.acceptTerms) {
-      setError("Please accept the terms and conditions")
-      setLoading(false)
-      return
-    }
 
     try {
       console.log("Sending Firebase OTP for registration...")
@@ -95,7 +113,7 @@ export default function RegisterPage() {
         formData.otp,
         formData.phone,
         "registration",
-        formData.name,
+        `${formData.firstName} ${formData.lastName}`,
         formData.email,
       )
 
@@ -107,7 +125,7 @@ export default function RegisterPage() {
 
         // Trigger storage event for header update
         window.dispatchEvent(new Event("storage"))
-        router.push("/?welcome=true")
+        router.push("/")
       } else {
         throw new Error(result.error || "Failed to verify OTP")
       }
@@ -121,6 +139,11 @@ export default function RegisterPage() {
 
   const handleBackToDetails = () => {
     setStep("details")
+    setError("")
+  }
+
+  const handleBackToPhone = () => {
+    setStep("phone")
     setError("")
     setConfirmationResult(null)
   }
@@ -162,16 +185,16 @@ export default function RegisterPage() {
           <div className="max-w-md text-center">
             <h1 className="text-4xl font-bold mb-6">Join oneofwun</h1>
             <p className="text-lg text-gray-200 mb-8">
-              Create your account with just your phone number and discover premium fashion.
+              Create your account and discover exclusive fashion collections curated just for you.
             </p>
             <div className="space-y-4 text-left">
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Exclusive access to premium collections</span>
+                <span>Exclusive member-only collections</span>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Early access to sales and new arrivals</span>
+                <span>Early access to new arrivals</span>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-white rounded-full"></div>
@@ -179,7 +202,7 @@ export default function RegisterPage() {
               </div>
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Free shipping on orders above ₹999</span>
+                <span>Special member discounts</span>
               </div>
             </div>
           </div>
@@ -215,13 +238,16 @@ export default function RegisterPage() {
 
               <CardTitle className="text-2xl font-bold text-gray-900">Create Account</CardTitle>
               <CardDescription className="text-gray-600">
-                {step === "details" ? "Enter your details to get started" : "Enter the OTP sent to your phone"}
+                {step === "details" && "Enter your details to get started"}
+                {step === "phone" && "We'll send you a verification code"}
+                {step === "otp" && "Enter the code sent to your phone"}
               </CardDescription>
 
               {/* Progress Indicator */}
               <div className="flex items-center justify-center space-x-2 mt-6">
-                <div className={`w-8 h-2 rounded-full ${step === "details" ? "bg-black" : "bg-gray-200"}`}></div>
-                <div className={`w-8 h-2 rounded-full ${step === "otp" ? "bg-black" : "bg-gray-200"}`}></div>
+                <div className={`w-6 h-2 rounded-full ${step === "details" ? "bg-black" : "bg-gray-200"}`}></div>
+                <div className={`w-6 h-2 rounded-full ${step === "phone" ? "bg-black" : "bg-gray-200"}`}></div>
+                <div className={`w-6 h-2 rounded-full ${step === "otp" ? "bg-black" : "bg-gray-200"}`}></div>
               </div>
             </CardHeader>
 
@@ -263,22 +289,38 @@ export default function RegisterPage() {
               )}
 
               {step === "details" && (
-                <form onSubmit={handleSendOtp} className="space-y-6">
-                  {/* Name Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                      Full Name
-                    </Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <form onSubmit={handleDetailsSubmit} className="space-y-6">
+                  {/* Name Fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">
+                        First Name
+                      </Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          id="firstName"
+                          type="text"
+                          required
+                          value={formData.firstName}
+                          onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                          placeholder="John"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">
+                        Last Name
+                      </Label>
                       <Input
-                        id="name"
+                        id="lastName"
                         type="text"
                         required
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
-                        placeholder="Enter your full name"
+                        value={formData.lastName}
+                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        className="h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                        placeholder="Doe"
                       />
                     </div>
                   </div>
@@ -297,7 +339,7 @@ export default function RegisterPage() {
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
-                        placeholder="Enter your email address"
+                        placeholder="john@example.com"
                       />
                     </div>
                   </div>
@@ -322,6 +364,48 @@ export default function RegisterPage() {
                     <p className="text-xs text-gray-500">Enter your phone number with country code</p>
                   </div>
 
+                  {/* Terms and Conditions */}
+                  <div className="flex items-start space-x-3">
+                    <Checkbox
+                      id="terms"
+                      checked={formData.acceptTerms}
+                      onCheckedChange={(checked) => setFormData({ ...formData, acceptTerms: checked as boolean })}
+                      className="rounded border-gray-300 mt-1"
+                    />
+                    <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
+                      I agree to the{" "}
+                      <Link href="/terms" className="text-black hover:text-gray-700 underline">
+                        Terms of Service
+                      </Link>{" "}
+                      and{" "}
+                      <Link href="/privacy" className="text-black hover:text-gray-700 underline">
+                        Privacy Policy
+                      </Link>
+                    </Label>
+                  </div>
+
+                  {/* Continue Button */}
+                  <Button
+                    type="submit"
+                    className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                  >
+                    Continue
+                  </Button>
+                </form>
+              )}
+
+              {step === "phone" && (
+                <form onSubmit={handleSendOtp} className="space-y-6">
+                  {/* User Info Display */}
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                    <p className="text-sm text-gray-600">Creating account for:</p>
+                    <p className="font-medium text-gray-900">
+                      {formData.firstName} {formData.lastName}
+                    </p>
+                    <p className="text-sm text-gray-600">{formData.email}</p>
+                    <p className="text-sm text-gray-600">{formData.phone}</p>
+                  </div>
+
                   {/* Firebase reCAPTCHA Container */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
@@ -329,68 +413,43 @@ export default function RegisterPage() {
                       id="recaptcha-container"
                       className="flex justify-center min-h-[78px] items-center border border-gray-200 rounded-lg bg-gray-50"
                     ></div>
-                    <p className="text-xs text-gray-500">Complete the security check to continue</p>
+                    <p className="text-xs text-gray-500">Complete the security check to send OTP</p>
                   </div>
 
-                  {/* Terms and Conditions */}
+                  {/* Action Buttons */}
                   <div className="space-y-4">
-                    <div className="flex items-start space-x-3">
-                      <Checkbox
-                        id="terms"
-                        checked={formData.acceptTerms}
-                        onCheckedChange={(checked) => setFormData({ ...formData, acceptTerms: checked as boolean })}
-                        className="mt-1 rounded border-gray-300"
-                      />
-                      <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
-                        I agree to the{" "}
-                        <Link href="/terms" className="text-black hover:underline font-medium">
-                          Terms of Service
-                        </Link>{" "}
-                        and{" "}
-                        <Link href="/privacy" className="text-black hover:underline font-medium">
-                          Privacy Policy
-                        </Link>
-                      </Label>
-                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Sending OTP...
+                        </div>
+                      ) : (
+                        "Send Verification Code"
+                      )}
+                    </Button>
 
-                    <div className="flex items-center space-x-3">
-                      <Checkbox
-                        id="remember"
-                        checked={formData.rememberMe}
-                        onCheckedChange={(checked) => setFormData({ ...formData, rememberMe: checked as boolean })}
-                        className="rounded border-gray-300"
-                      />
-                      <Label htmlFor="remember" className="text-sm text-gray-600">
-                        Keep me signed in
-                      </Label>
-                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleBackToDetails}
+                      variant="outline"
+                      className="w-full h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
+                    >
+                      Back to Details
+                    </Button>
                   </div>
-
-                  {/* Send OTP Button */}
-                  <Button
-                    type="submit"
-                    className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <div className="flex items-center">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                        Sending OTP...
-                      </div>
-                    ) : (
-                      "Send OTP"
-                    )}
-                  </Button>
                 </form>
               )}
 
               {step === "otp" && (
                 <form onSubmit={handleVerifyOtp} className="space-y-6">
-                  {/* User Details Display */}
+                  {/* Phone Display */}
                   <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                    <p className="text-sm text-gray-600">Creating account for:</p>
-                    <p className="font-medium text-gray-900">{formData.name}</p>
-                    <p className="font-medium text-gray-900">{formData.email}</p>
+                    <p className="text-sm text-gray-600">Verification code sent to:</p>
                     <p className="font-medium text-gray-900">{formData.phone}</p>
                     <p className="text-xs text-green-600 mt-1">✅ Real SMS sent via Firebase</p>
                   </div>
@@ -398,7 +457,7 @@ export default function RegisterPage() {
                   {/* OTP Field */}
                   <div className="space-y-2">
                     <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
-                      Enter OTP
+                      Enter Verification Code
                     </Label>
                     <div className="relative">
                       <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -436,7 +495,7 @@ export default function RegisterPage() {
                     <div className="flex space-x-4">
                       <Button
                         type="button"
-                        onClick={handleBackToDetails}
+                        onClick={handleBackToPhone}
                         variant="outline"
                         className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
                       >
@@ -449,7 +508,7 @@ export default function RegisterPage() {
                         className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
                         disabled={loading}
                       >
-                        Resend OTP
+                        Resend Code
                       </Button>
                     </div>
                   </div>
@@ -461,7 +520,7 @@ export default function RegisterPage() {
                 <p className="text-sm text-gray-600">
                   Already have an account?{" "}
                   <Link href="/login" className="text-black hover:text-gray-700 font-medium">
-                    Sign in instead
+                    Sign in here
                   </Link>
                 </p>
               </div>
