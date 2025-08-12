@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app"
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"
+import type { ConfirmationResult } from "firebase/auth"
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -27,5 +28,4 @@ export const createRecaptchaVerifier = (containerId = "recaptcha-container") => 
   })
 }
 
-export { signInWithPhoneNumber }
-export type { ConfirmationResult } from "firebase/auth"
+export { signInWithPhoneNumber, type ConfirmationResult }
