@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -10,16 +10,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  requestPhoneOtp,
-  verifyPhoneOtp,
-  isValidE164Phone,
-  loadRecaptchaScript,
-  executeRecaptcha,
-} from "@/lib/otp-auth"
+import { Recaptcha } from "@/components/ui/recaptcha"
+import { requestPhoneOtp, verifyPhoneOtp, isValidE164Phone } from "@/lib/otp-auth"
 import { ArrowLeft, Phone, Shield } from "lucide-react"
 
-const RECAPTCHA_SITE_KEY = "6LfemqMrAAAAAKPE4E9SMFcRZKolPLp7N4jiearD" // Correct site key for frontend
+const RECAPTCHA_SITE_KEY = "6LfemqMrAAAAAKPE4E9SMFcRZKolPLp7N4jiearD"
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -30,18 +25,19 @@ export default function LoginPage() {
   const [step, setStep] = useState<"phone" | "otp">("phone")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [otpSent, setOtpSent] = useState(false)
-  const [recaptchaLoaded, setRecaptchaLoaded] = useState(false)
+  const [recaptchaToken, setRecaptchaToken] = useState("")
+  const recaptchaRef = useRef<any>(null)
   const router = useRouter()
 
-  useEffect(() => {
-    loadRecaptchaScript()
-      .then(() => setRecaptchaLoaded(true))
-      .catch((error) => {
-        console.error("Failed to load reCAPTCHA:", error)
-        setError("Failed to load security verification. Please refresh the page.")
-      })
-  }, [])
+  const handleRecaptchaVerify = (token: string) => {
+    setRecaptchaToken(token)
+    setError("")
+  }
+
+  const handleRecaptchaError = (error: string) => {
+    setRecaptchaToken("")
+    setError(error)
+  }
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,30 +51,26 @@ export default function LoginPage() {
       return
     }
 
-    if (!recaptchaLoaded) {
-      setError("Security verification not ready. Please wait a moment and try again.")
+    // Check reCAPTCHA token
+    if (!recaptchaToken) {
+      setError("Please complete the security verification")
       setLoading(false)
       return
     }
 
     try {
-      const recaptchaToken = await executeRecaptcha(RECAPTCHA_SITE_KEY, "send_otp")
-
       await requestPhoneOtp({
         phone: formData.phone,
         purpose: "login",
         channel: "sms",
-        recaptchaToken, // Include reCAPTCHA token
+        recaptchaToken,
       })
-      setOtpSent(true)
       setStep("otp")
     } catch (error: any) {
       console.error("OTP request failed:", error)
-      if (error.message?.includes("reCAPTCHA")) {
-        setError("Security verification failed. Please refresh the page and try again.")
-      } else {
-        setError(error.message || "Failed to send OTP")
-      }
+      setError(error.message || "Failed to send OTP")
+      // Reset reCAPTCHA on error
+      setRecaptchaToken("")
     } finally {
       setLoading(false)
     }
@@ -116,13 +108,13 @@ export default function LoginPage() {
 
   const handleBackToPhone = () => {
     setStep("phone")
-    setOtpSent(false)
     setError("")
+    setRecaptchaToken("")
   }
 
   const handleResendOtp = async () => {
-    if (!recaptchaLoaded) {
-      setError("Security verification not ready. Please wait a moment and try again.")
+    if (!recaptchaToken) {
+      setError("Please complete the security verification first")
       return
     }
 
@@ -130,25 +122,18 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const recaptchaToken = await executeRecaptcha(RECAPTCHA_SITE_KEY, "resend_otp")
-
       await requestPhoneOtp({
         phone: formData.phone,
         purpose: "login",
         channel: "sms",
         recaptchaToken,
       })
-      setError("")
-      // Show success message briefly
       setError("OTP resent successfully!")
       setTimeout(() => setError(""), 3000)
     } catch (error: any) {
       console.error("OTP resend failed:", error)
-      if (error.message?.includes("reCAPTCHA")) {
-        setError("Security verification failed. Please refresh the page and try again.")
-      } else {
-        setError(error.message || "Failed to resend OTP")
-      }
+      setError(error.message || "Failed to resend OTP")
+      setRecaptchaToken("")
     } finally {
       setLoading(false)
     }
@@ -257,6 +242,20 @@ export default function LoginPage() {
                     <p className="text-xs text-gray-500">Enter your phone number with country code</p>
                   </div>
 
+                  {/* reCAPTCHA */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
+                    <Recaptcha
+                      ref={recaptchaRef}
+                      siteKey={RECAPTCHA_SITE_KEY}
+                      onVerify={handleRecaptchaVerify}
+                      onError={handleRecaptchaError}
+                      onExpired={() => setRecaptchaToken("")}
+                      theme="light"
+                      size="normal"
+                    />
+                  </div>
+
                   {/* Remember Me */}
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -274,15 +273,13 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                    disabled={loading || !recaptchaLoaded}
+                    disabled={loading || !recaptchaToken}
                   >
                     {loading ? (
                       <div className="flex items-center">
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                         Sending OTP...
                       </div>
-                    ) : !recaptchaLoaded ? (
-                      "Loading security verification..."
                     ) : (
                       "Send OTP"
                     )}
@@ -349,7 +346,7 @@ export default function LoginPage() {
                         onClick={handleResendOtp}
                         variant="outline"
                         className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
-                        disabled={loading || !recaptchaLoaded}
+                        disabled={loading || !recaptchaToken}
                       >
                         Resend OTP
                       </Button>
