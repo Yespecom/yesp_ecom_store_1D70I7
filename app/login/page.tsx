@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -10,12 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Recaptcha } from "@/components/ui/recaptcha"
-import { requestPhoneOtp, verifyPhoneOtp, isValidE164Phone } from "@/lib/otp-auth"
+import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
+import { isValidE164Phone } from "@/lib/otp-auth"
 import { ArrowLeft, Phone, Shield } from "lucide-react"
-
-// Use environment variable or fallback to Google's test key
-const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -26,59 +23,34 @@ export default function LoginPage() {
   const [step, setStep] = useState<"phone" | "otp">("phone")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [recaptchaToken, setRecaptchaToken] = useState("")
-  const recaptchaRef = useRef<any>(null)
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
   const router = useRouter()
-
-  const handleRecaptchaVerify = (token: string) => {
-    console.log("reCAPTCHA verified:", token.substring(0, 20) + "...")
-    setRecaptchaToken(token)
-    setError("")
-  }
-
-  const handleRecaptchaError = (error: string) => {
-    console.error("reCAPTCHA error:", error)
-    setRecaptchaToken("")
-    setError(error)
-  }
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
 
-    // Validate phone number format
     if (!isValidE164Phone(formData.phone)) {
       setError("Please enter a valid phone number with country code (e.g., +919876543210)")
       setLoading(false)
       return
     }
 
-    // Check reCAPTCHA token
-    if (!recaptchaToken) {
-      setError("Please complete the security verification")
-      setLoading(false)
-      return
-    }
-
     try {
-      console.log("Sending OTP request...")
-      await requestPhoneOtp({
-        phone: formData.phone,
-        purpose: "login",
-        channel: "sms",
-        recaptchaToken,
-      })
-      console.log("OTP sent successfully")
-      setStep("otp")
-    } catch (error: any) {
-      console.error("OTP request failed:", error)
-      setError(error.message || "Failed to send OTP")
-      // Reset reCAPTCHA on error
-      setRecaptchaToken("")
-      if (recaptchaRef.current) {
-        recaptchaRef.current.reset()
+      console.log("Sending Firebase OTP for login...")
+      const result = await sendFirebaseOTP(formData.phone)
+
+      if (result.success && result.confirmationResult) {
+        setConfirmationResult(result.confirmationResult)
+        setStep("otp")
+        console.log("Firebase OTP sent successfully")
+      } else {
+        throw new Error(result.error || "Failed to send OTP")
       }
+    } catch (error: any) {
+      console.error("Firebase OTP request failed:", error)
+      setError(error.message || "Failed to send OTP")
     } finally {
       setLoading(false)
     }
@@ -89,28 +61,30 @@ export default function LoginPage() {
     setLoading(true)
     setError("")
 
-    try {
-      console.log("Verifying OTP...")
-      const response = await verifyPhoneOtp({
-        phone: formData.phone,
-        otp: formData.otp,
-        purpose: "login",
-        rememberMe: formData.rememberMe,
-        recaptchaToken, // Pass the recaptcha token for verification too
-      })
+    if (!confirmationResult) {
+      setError("Please request OTP first")
+      setLoading(false)
+      return
+    }
 
-      if (response.token && response.customer) {
+    try {
+      console.log("Verifying Firebase OTP for login...")
+      const result = await verifyFirebaseOTP(confirmationResult, formData.otp, formData.phone, "login")
+
+      if (result.success && result.token && result.customer) {
         console.log("Login successful")
         // Store authentication data
-        localStorage.setItem("auth_token", response.token)
-        localStorage.setItem("user_data", JSON.stringify(response.customer))
+        localStorage.setItem("auth_token", result.token)
+        localStorage.setItem("user_data", JSON.stringify(result.customer))
 
         // Trigger storage event for header update
         window.dispatchEvent(new Event("storage"))
         router.push("/")
+      } else {
+        throw new Error(result.error || "Failed to verify OTP")
       }
     } catch (error: any) {
-      console.error("OTP verification failed:", error)
+      console.error("Firebase OTP verification failed:", error)
       setError(error.message || "Invalid OTP")
     } finally {
       setLoading(false)
@@ -120,37 +94,26 @@ export default function LoginPage() {
   const handleBackToPhone = () => {
     setStep("phone")
     setError("")
-    setRecaptchaToken("")
-    if (recaptchaRef.current) {
-      recaptchaRef.current.reset()
-    }
+    setConfirmationResult(null)
   }
 
   const handleResendOtp = async () => {
-    if (!recaptchaToken) {
-      setError("Please complete the security verification first")
-      return
-    }
-
     setLoading(true)
     setError("")
 
     try {
-      await requestPhoneOtp({
-        phone: formData.phone,
-        purpose: "login",
-        channel: "sms",
-        recaptchaToken,
-      })
-      setError("OTP resent successfully!")
-      setTimeout(() => setError(""), 3000)
-    } catch (error: any) {
-      console.error("OTP resend failed:", error)
-      setError(error.message || "Failed to resend OTP")
-      setRecaptchaToken("")
-      if (recaptchaRef.current) {
-        recaptchaRef.current.reset()
+      const result = await sendFirebaseOTP(formData.phone)
+
+      if (result.success && result.confirmationResult) {
+        setConfirmationResult(result.confirmationResult)
+        setError("OTP resent successfully!")
+        setTimeout(() => setError(""), 3000)
+      } else {
+        throw new Error(result.error || "Failed to resend OTP")
       }
+    } catch (error: any) {
+      console.error("Firebase OTP resend failed:", error)
+      setError(error.message || "Failed to resend OTP")
     } finally {
       setLoading(false)
     }
@@ -264,18 +227,10 @@ export default function LoginPage() {
                     <p className="text-xs text-gray-500">Enter your phone number with country code</p>
                   </div>
 
-                  {/* reCAPTCHA */}
+                  {/* Firebase reCAPTCHA Container */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
-                    <Recaptcha
-                      ref={recaptchaRef}
-                      siteKey={RECAPTCHA_SITE_KEY}
-                      onVerify={handleRecaptchaVerify}
-                      onError={handleRecaptchaError}
-                      onExpired={() => setRecaptchaToken("")}
-                      theme="light"
-                      size="normal"
-                    />
+                    <div id="recaptcha-container" className="flex justify-center"></div>
                   </div>
 
                   {/* Remember Me */}
@@ -295,7 +250,7 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                    disabled={loading || !recaptchaToken}
+                    disabled={loading}
                   >
                     {loading ? (
                       <div className="flex items-center">
@@ -315,7 +270,7 @@ export default function LoginPage() {
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm text-gray-600">OTP sent to:</p>
                     <p className="font-medium text-gray-900">{formData.phone}</p>
-                    <p className="text-xs text-gray-500 mt-1">Check your SMS messages for the 6-digit code</p>
+                    <p className="text-xs text-green-600 mt-1">✅ Real SMS sent via Firebase</p>
                   </div>
 
                   {/* OTP Field */}
@@ -370,7 +325,7 @@ export default function LoginPage() {
                         onClick={handleResendOtp}
                         variant="outline"
                         className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
-                        disabled={loading || !recaptchaToken}
+                        disabled={loading}
                       >
                         Resend OTP
                       </Button>
