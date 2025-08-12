@@ -1,393 +1,346 @@
 "use client"
-
-import type React from "react"
-import { useState } from "react"
-import Link from "next/link"
-import Image from "next/image"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
-import { isValidE164Phone } from "@/lib/otp-auth"
-import { ArrowLeft, Phone, Shield, AlertCircle } from "lucide-react"
+import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, ArrowLeft, Phone, Shield, LogIn, Sparkles } from "lucide-react"
+import { toast } from "sonner"
+import { sendFirebaseOTP, verifyFirebaseOTP, cleanupFirebaseAuth } from "@/lib/firebase-auth"
+import { formatPhoneNumber, validatePhoneNumber } from "@/lib/otp-auth"
 
 export default function LoginPage() {
+  const router = useRouter()
+  const [step, setStep] = useState(1)
+  const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     phone: "",
     otp: "",
-    rememberMe: false,
   })
-  const [step, setStep] = useState<"phone" | "otp">("phone")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
-  const router = useRouter()
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupFirebaseAuth()
+    }
+  }, [])
 
-    if (!isValidE164Phone(formData.phone)) {
-      setError("Please enter a valid phone number with country code (e.g., +919876543210)")
-      setLoading(false)
+  const handleSendOTP = async () => {
+    if (!formData.phone.trim()) {
+      setErrors({ phone: "Phone number is required" })
       return
     }
 
-    try {
-      console.log("Sending Firebase OTP for login...")
-      const result = await sendFirebaseOTP(formData.phone)
-
-      if (result.success && result.confirmationResult) {
-        setConfirmationResult(result.confirmationResult)
-        setStep("otp")
-        console.log("Firebase OTP sent successfully")
-      } else {
-        throw new Error(result.error || "Failed to send OTP")
-      }
-    } catch (error: any) {
-      console.error("Firebase OTP request failed:", error)
-      setError(error.message || "Failed to send OTP")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
-
-    if (!confirmationResult) {
-      setError("Please request OTP first")
-      setLoading(false)
+    if (!validatePhoneNumber(formData.phone)) {
+      setErrors({ phone: "Please enter a valid Indian phone number" })
       return
     }
 
-    try {
-      console.log("Verifying Firebase OTP for login...")
-      const result = await verifyFirebaseOTP(
-        confirmationResult,
-        formData.otp,
-        formData.phone,
-        "login",
-        undefined, // name not required for login
-        undefined, // email not required for login, will be handled by server
-      )
-
-      if (result.success && result.token && result.customer) {
-        console.log("Login successful")
-        console.log("Customer data:", result.customer)
-
-        // Store authentication data
-        localStorage.setItem("auth_token", result.token)
-        localStorage.setItem("user_data", JSON.stringify(result.customer))
-
-        // Trigger storage event for header update
-        window.dispatchEvent(new Event("storage"))
-        router.push("/")
-      } else {
-        throw new Error(result.error || "Failed to verify OTP")
-      }
-    } catch (error: any) {
-      console.error("Firebase OTP verification failed:", error)
-      setError(error.message || "Invalid OTP")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleBackToPhone = () => {
-    setStep("phone")
-    setError("")
-    setConfirmationResult(null)
-  }
-
-  const handleResendOtp = async () => {
     setLoading(true)
-    setError("")
+    setErrors({})
 
     try {
-      const result = await sendFirebaseOTP(formData.phone)
+      const formattedPhone = formatPhoneNumber(formData.phone)
+      console.log("📱 Sending OTP to:", formattedPhone)
 
-      if (result.success && result.confirmationResult) {
-        setConfirmationResult(result.confirmationResult)
-        setError("OTP resent successfully!")
-        setTimeout(() => setError(""), 3000)
-      } else {
-        throw new Error(result.error || "Failed to resend OTP")
-      }
+      await sendFirebaseOTP(formattedPhone)
+      setFormData((prev) => ({ ...prev, phone: formattedPhone }))
+      setStep(2)
+      toast.success("OTP sent successfully!")
     } catch (error: any) {
-      console.error("Firebase OTP resend failed:", error)
-      setError(error.message || "Failed to resend OTP")
+      console.error("❌ Send OTP error:", error)
+      toast.error(error.message || "Failed to send OTP")
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleVerifyOTP = async () => {
+    if (!formData.otp.trim()) {
+      setErrors({ otp: "Please enter the OTP" })
+      return
+    }
+
+    if (formData.otp.length !== 6) {
+      setErrors({ otp: "OTP must be 6 digits" })
+      return
+    }
+
+    setLoading(true)
+    setErrors({})
+
+    try {
+      console.log("🔍 Verifying Firebase OTP for login...")
+
+      const result = await verifyFirebaseOTP(formData.otp, "login")
+
+      console.log("✅ Login successful:", result)
+      toast.success("Login successful!")
+
+      // Redirect to home page
+      router.push("/")
+    } catch (error: any) {
+      console.error("❌ Login error:", error)
+      toast.error(error.message || "Login failed")
+      setErrors({ otp: error.message || "Invalid OTP" })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: "" }))
+    }
+  }
+
+  const handleBackToStep1 = () => {
+    setStep(1)
+    setFormData((prev) => ({ ...prev, otp: "" }))
+    setErrors({})
+    cleanupFirebaseAuth()
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">
-      {/* Left Side - Hero Image */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: `url("/placeholder.svg?height=800&width=600&text=Welcome+Back")`,
-          }}
-        />
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
-          <div className="max-w-md text-center">
-            <h1 className="text-4xl font-bold mb-6">Welcome Back</h1>
-            <p className="text-lg text-gray-200 mb-8">
-              Sign in to your oneofwun account and continue your fashion journey.
-            </p>
-            <div className="space-y-4 text-left">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Access your order history</span>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background decorations */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-emerald-400/20 to-teal-400/20 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-blue-400/20 to-emerald-400/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-teal-300/10 to-emerald-300/10 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* reCAPTCHA container */}
+      <div id="recaptcha-container"></div>
+
+      <div className="w-full max-w-lg relative z-10">
+        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-xl rounded-3xl overflow-hidden">
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 text-white relative">
+            <div className="absolute inset-0 bg-black/10"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-6">
+                {step === 2 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBackToStep1}
+                    className="p-2 hover:bg-white/20 rounded-full text-white border-white/20"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                )}
+                <div className="flex-1 text-center">
+                  <div className="flex items-center justify-center mb-3">
+                    <Sparkles className="h-8 w-8 mr-2" />
+                    <CardTitle className="text-3xl font-bold">
+                      {step === 1 ? "Welcome Back" : "Verify & Login"}
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-emerald-100 text-lg">
+                    {step === 1
+                      ? "Sign in to your OneofWun account"
+                      : "Enter the verification code we sent to your phone"}
+                  </CardDescription>
+                </div>
+                <div className="w-8" />
               </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Track your current orders</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Manage your wishlist</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Get personalized recommendations</span>
+
+              {/* Enhanced progress indicator */}
+              <div className="flex items-center justify-center space-x-3">
+                <div
+                  className={`w-4 h-4 rounded-full transition-all duration-300 ${step >= 1 ? "bg-white shadow-lg" : "bg-white/30"}`}
+                />
+                <div
+                  className={`w-12 h-1 rounded-full transition-all duration-300 ${step >= 2 ? "bg-white" : "bg-white/30"}`}
+                />
+                <div
+                  className={`w-4 h-4 rounded-full transition-all duration-300 ${step >= 2 ? "bg-white shadow-lg" : "bg-white/30"}`}
+                />
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          {/* Back to Home */}
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-8 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
-          </Link>
-
-          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
-            <CardHeader className="text-center pb-8">
-              {/* Logo */}
-              <Link href="/" className="flex items-center justify-center space-x-3 mb-6">
-                <div className="relative w-12 h-8">
-                  <Image
-                    src="/placeholder.svg?height=32&width=48&text=Logo"
-                    alt="oneofwun"
-                    fill
-                    className="object-contain"
-                  />
-                </div>
-                <span className="text-2xl font-bold text-gray-900">oneofwun</span>
-              </Link>
-
-              <CardTitle className="text-2xl font-bold text-gray-900">Sign In</CardTitle>
-              <CardDescription className="text-gray-600">
-                {step === "phone" ? "Enter your phone number to continue" : "Enter the OTP sent to your phone"}
-              </CardDescription>
-
-              {/* Progress Indicator */}
-              <div className="flex items-center justify-center space-x-2 mt-6">
-                <div className={`w-8 h-2 rounded-full ${step === "phone" ? "bg-black" : "bg-gray-200"}`}></div>
-                <div className={`w-8 h-2 rounded-full ${step === "otp" ? "bg-black" : "bg-gray-200"}`}></div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="space-y-6">
-              {error && (
-                <div
-                  className={`border px-4 py-3 rounded-lg text-sm flex items-center ${
-                    error.includes("successfully")
-                      ? "bg-green-50 border-green-200 text-green-600"
-                      : "bg-red-50 border-red-200 text-red-600"
-                  }`}
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full mr-3 ${
-                      error.includes("successfully") ? "bg-green-500" : "bg-red-500"
-                    }`}
-                  ></div>
-                  {error}
-                </div>
-              )}
-
-              {/* Firebase Configuration Warning */}
-              {error.includes("authorized domain") && (
-                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                  <div className="flex items-start space-x-3">
-                    <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                    <div className="text-sm text-yellow-800">
-                      <p className="font-medium mb-2">Firebase Configuration Required</p>
-                      <p className="mb-2">To enable phone authentication, please:</p>
-                      <ol className="list-decimal list-inside space-y-1 text-xs">
-                        <li>Go to Firebase Console → Authentication → Settings</li>
-                        <li>Add your domain to "Authorized domains"</li>
-                        <li>Enable Phone authentication in Sign-in methods</li>
-                        <li>Configure your Firebase project settings</li>
-                      </ol>
+          <CardContent className="p-8 space-y-8">
+            {step === 1 ? (
+              <>
+                {/* Step 1: Phone Number */}
+                <div className="space-y-6">
+                  <div className="text-center space-y-4">
+                    <div className="w-20 h-20 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full flex items-center justify-center mx-auto">
+                      <Phone className="h-10 w-10 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-800 mb-2">Enter Your Phone Number</h3>
+                      <p className="text-gray-600">We'll send you a secure verification code</p>
                     </div>
                   </div>
-                </div>
-              )}
 
-              {step === "phone" && (
-                <form onSubmit={handleSendOtp} className="space-y-6">
-                  {/* Phone Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="phone"
+                      className="text-sm font-semibold text-gray-700 flex items-center justify-center"
+                    >
+                      <Phone className="h-4 w-4 mr-2 text-emerald-500" />
                       Phone Number
                     </Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        id="phone"
-                        type="tel"
-                        required
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
-                        placeholder="+919876543210"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500">Enter your phone number with country code</p>
-                  </div>
-
-                  {/* Firebase reCAPTCHA Container */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
-                    <div
-                      id="recaptcha-container"
-                      className="flex justify-center min-h-[78px] items-center border border-gray-200 rounded-lg bg-gray-50"
-                    ></div>
-                    <p className="text-xs text-gray-500">Complete the security check to continue</p>
-                  </div>
-
-                  {/* Remember Me */}
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id="remember"
-                      checked={formData.rememberMe}
-                      onCheckedChange={(checked) => setFormData({ ...formData, rememberMe: checked as boolean })}
-                      className="rounded border-gray-300"
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="Enter your phone number"
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange("phone", e.target.value)}
+                      className={`h-16 text-lg text-center rounded-xl border-2 transition-all duration-200 ${
+                        errors.phone
+                          ? "border-red-400 focus:border-red-500 bg-red-50"
+                          : "border-gray-200 focus:border-emerald-500 hover:border-gray-300"
+                      }`}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          handleSendOTP()
+                        }
+                      }}
                     />
-                    <Label htmlFor="remember" className="text-sm text-gray-600">
-                      Keep me signed in
-                    </Label>
+                    {errors.phone && (
+                      <p className="text-sm text-red-600 text-center flex items-center justify-center">
+                        <span className="w-1 h-1 bg-red-600 rounded-full mr-2"></span>
+                        {errors.phone}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Send OTP Button */}
+                  <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-6 border border-emerald-100">
+                    <div className="flex items-center justify-center space-x-2 text-emerald-700">
+                      <Shield className="h-5 w-5" />
+                      <span className="text-sm font-medium">Secure & Fast Authentication</span>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleSendOTP}
+                  disabled={loading}
+                  className="w-full h-14 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+                      Sending Code...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="mr-3 h-6 w-6" />
+                      Send Verification Code
+                    </>
+                  )}
+                </Button>
+              </>
+            ) : (
+              <>
+                {/* Step 2: OTP Verification */}
+                <div className="space-y-6">
+                  <div className="text-center space-y-4">
+                    <div className="w-20 h-20 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full flex items-center justify-center mx-auto">
+                      <Shield className="h-10 w-10 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-800 mb-2">Check Your Messages</h3>
+                      <p className="text-gray-600">We've sent a 6-digit verification code to</p>
+                      <p className="font-semibold text-emerald-600 text-lg">{formData.phone}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label htmlFor="otp" className="text-sm font-semibold text-gray-700 text-center block">
+                      Enter Verification Code
+                    </Label>
+                    <Input
+                      id="otp"
+                      type="text"
+                      placeholder="• • • • • •"
+                      value={formData.otp}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "").slice(0, 6)
+                        handleInputChange("otp", value)
+                      }}
+                      className={`text-center text-2xl font-bold h-16 rounded-xl border-2 tracking-widest ${
+                        errors.otp
+                          ? "border-red-400 focus:border-red-500 bg-red-50"
+                          : "border-gray-200 focus:border-emerald-500 hover:border-gray-300"
+                      }`}
+                      maxLength={6}
+                      autoComplete="one-time-code"
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && formData.otp.length === 6) {
+                          handleVerifyOTP()
+                        }
+                      }}
+                    />
+                    {errors.otp && (
+                      <p className="text-sm text-red-600 text-center flex items-center justify-center">
+                        <span className="w-1 h-1 bg-red-600 rounded-full mr-2"></span>
+                        {errors.otp}
+                      </p>
+                    )}
+                  </div>
+
+                  <Alert className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-emerald-50 rounded-xl">
+                    <AlertDescription className="text-sm text-blue-800 text-center">
+                      <strong>Didn't receive the code?</strong> Check your messages or wait a moment before requesting a
+                      new one.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
+                <div className="space-y-4">
                   <Button
-                    type="submit"
-                    className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                    disabled={loading}
+                    onClick={handleVerifyOTP}
+                    disabled={loading || formData.otp.length !== 6}
+                    className="w-full h-14 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:transform-none"
                   >
                     {loading ? (
-                      <div className="flex items-center">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                        Sending OTP...
-                      </div>
+                      <>
+                        <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+                        Signing You In...
+                      </>
                     ) : (
-                      "Send OTP"
+                      <>
+                        <LogIn className="mr-3 h-6 w-6" />
+                        Sign In to Account
+                      </>
                     )}
                   </Button>
-                </form>
-              )}
 
-              {step === "otp" && (
-                <form onSubmit={handleVerifyOtp} className="space-y-6">
-                  {/* Phone Display */}
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                    <p className="text-sm text-gray-600">Signing in with:</p>
-                    <p className="font-medium text-gray-900">{formData.phone}</p>
-                    <p className="text-xs text-green-600 mt-1">✅ Real SMS sent via Firebase</p>
-                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleSendOTP}
+                    disabled={loading}
+                    className="w-full h-12 border-2 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 bg-transparent rounded-xl font-medium transition-all duration-200"
+                  >
+                    Resend Code
+                  </Button>
+                </div>
+              </>
+            )}
 
-                  {/* OTP Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
-                      Enter OTP
-                    </Label>
-                    <div className="relative">
-                      <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        id="otp"
-                        type="text"
-                        required
-                        value={formData.otp}
-                        onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
-                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-center text-lg tracking-widest"
-                        placeholder="000000"
-                        maxLength={6}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500">Enter the 6-digit code from your SMS</p>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-4">
-                    <Button
-                      type="submit"
-                      className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <div className="flex items-center">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                          Signing In...
-                        </div>
-                      ) : (
-                        "Verify & Sign In"
-                      )}
-                    </Button>
-
-                    <div className="flex space-x-4">
-                      <Button
-                        type="button"
-                        onClick={handleBackToPhone}
-                        variant="outline"
-                        className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
-                      >
-                        Back
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleResendOtp}
-                        variant="outline"
-                        className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
-                        disabled={loading}
-                      >
-                        Resend OTP
-                      </Button>
-                    </div>
-                  </div>
-                </form>
-              )}
-
-              {/* Create Account Link */}
-              <div className="text-center pt-6 border-t border-gray-100">
-                <p className="text-sm text-gray-600">
-                  Don't have an account?{" "}
-                  <Link href="/register" className="text-black hover:text-gray-700 font-medium">
-                    Create one now
-                  </Link>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            <div className="text-center pt-6 border-t border-gray-100">
+              <p className="text-gray-600">
+                Don't have an account?{" "}
+                <Link
+                  href="/register"
+                  className="text-emerald-600 hover:text-emerald-800 font-semibold underline decoration-2 underline-offset-2"
+                >
+                  Create one here
+                </Link>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
