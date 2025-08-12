@@ -12,15 +12,18 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
-import { ArrowLeft, Phone, Shield, AlertCircle } from "lucide-react"
+import { ArrowLeft, Phone, Shield, User, AlertCircle, Mail } from "lucide-react"
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const [formData, setFormData] = useState({
+    name: "",
+    email: "",
     phone: "",
     otp: "",
+    acceptTerms: false,
     rememberMe: false,
   })
-  const [step, setStep] = useState<"phone" | "otp">("phone")
+  const [step, setStep] = useState<"details" | "otp">("details")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
@@ -31,14 +34,32 @@ export default function LoginPage() {
     setLoading(true)
     setError("")
 
+    if (!formData.name.trim()) {
+      setError("Please enter your full name")
+      setLoading(false)
+      return
+    }
+
+    if (!formData.email.trim()) {
+      setError("Please enter your email address")
+      setLoading(false)
+      return
+    }
+
     if (!isValidE164Phone(formData.phone)) {
       setError("Please enter a valid phone number with country code (e.g., +919876543210)")
       setLoading(false)
       return
     }
 
+    if (!formData.acceptTerms) {
+      setError("Please accept the terms and conditions")
+      setLoading(false)
+      return
+    }
+
     try {
-      console.log("Sending Firebase OTP for login...")
+      console.log("Sending Firebase OTP for registration...")
       const result = await sendFirebaseOTP(formData.phone)
 
       if (result.success && result.confirmationResult) {
@@ -68,25 +89,25 @@ export default function LoginPage() {
     }
 
     try {
-      console.log("Verifying Firebase OTP for login...")
+      console.log("Verifying Firebase OTP for registration...")
       const result = await verifyFirebaseOTP(
         confirmationResult,
         formData.otp,
         formData.phone,
-        "login",
-        undefined, // name not required for login
-        undefined, // email not required for login, will be auto-generated
+        "registration",
+        formData.name,
+        formData.email,
       )
 
       if (result.success && result.token && result.customer) {
-        console.log("Login successful")
+        console.log("Registration successful")
         // Store authentication data
         localStorage.setItem("auth_token", result.token)
         localStorage.setItem("user_data", JSON.stringify(result.customer))
 
         // Trigger storage event for header update
         window.dispatchEvent(new Event("storage"))
-        router.push("/")
+        router.push("/?welcome=true")
       } else {
         throw new Error(result.error || "Failed to verify OTP")
       }
@@ -98,8 +119,8 @@ export default function LoginPage() {
     }
   }
 
-  const handleBackToPhone = () => {
-    setStep("phone")
+  const handleBackToDetails = () => {
+    setStep("details")
     setError("")
     setConfirmationResult(null)
   }
@@ -133,39 +154,39 @@ export default function LoginPage() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url("/placeholder.svg?height=800&width=600&text=Welcome+Back")`,
+            backgroundImage: `url("/placeholder.svg?height=800&width=600&text=Join+oneofwun")`,
           }}
         />
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
           <div className="max-w-md text-center">
-            <h1 className="text-4xl font-bold mb-6">Welcome Back</h1>
+            <h1 className="text-4xl font-bold mb-6">Join oneofwun</h1>
             <p className="text-lg text-gray-200 mb-8">
-              Sign in to your oneofwun account and continue your fashion journey.
+              Create your account with just your phone number and discover premium fashion.
             </p>
             <div className="space-y-4 text-left">
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Access your order history</span>
+                <span>Exclusive access to premium collections</span>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Track your current orders</span>
+                <span>Early access to sales and new arrivals</span>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Manage your wishlist</span>
+                <span>Personalized style recommendations</span>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span>Get personalized recommendations</span>
+                <span>Free shipping on orders above ₹999</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Side - Login Form */}
+      {/* Right Side - Registration Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Back to Home */}
@@ -192,14 +213,14 @@ export default function LoginPage() {
                 <span className="text-2xl font-bold text-gray-900">oneofwun</span>
               </Link>
 
-              <CardTitle className="text-2xl font-bold text-gray-900">Sign In</CardTitle>
+              <CardTitle className="text-2xl font-bold text-gray-900">Create Account</CardTitle>
               <CardDescription className="text-gray-600">
-                {step === "phone" ? "Enter your phone number to continue" : "Enter the OTP sent to your phone"}
+                {step === "details" ? "Enter your details to get started" : "Enter the OTP sent to your phone"}
               </CardDescription>
 
               {/* Progress Indicator */}
               <div className="flex items-center justify-center space-x-2 mt-6">
-                <div className={`w-8 h-2 rounded-full ${step === "phone" ? "bg-black" : "bg-gray-200"}`}></div>
+                <div className={`w-8 h-2 rounded-full ${step === "details" ? "bg-black" : "bg-gray-200"}`}></div>
                 <div className={`w-8 h-2 rounded-full ${step === "otp" ? "bg-black" : "bg-gray-200"}`}></div>
               </div>
             </CardHeader>
@@ -241,8 +262,46 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {step === "phone" && (
+              {step === "details" && (
                 <form onSubmit={handleSendOtp} className="space-y-6">
+                  {/* Name Field */}
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                      Full Name
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        id="name"
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                        placeholder="Enter your full name"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email Field */}
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                      Email Address
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        id="email"
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                        placeholder="Enter your email address"
+                      />
+                    </div>
+                  </div>
+
                   {/* Phone Field */}
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
@@ -273,17 +332,38 @@ export default function LoginPage() {
                     <p className="text-xs text-gray-500">Complete the security check to continue</p>
                   </div>
 
-                  {/* Remember Me */}
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id="remember"
-                      checked={formData.rememberMe}
-                      onCheckedChange={(checked) => setFormData({ ...formData, rememberMe: checked as boolean })}
-                      className="rounded border-gray-300"
-                    />
-                    <Label htmlFor="remember" className="text-sm text-gray-600">
-                      Keep me signed in
-                    </Label>
+                  {/* Terms and Conditions */}
+                  <div className="space-y-4">
+                    <div className="flex items-start space-x-3">
+                      <Checkbox
+                        id="terms"
+                        checked={formData.acceptTerms}
+                        onCheckedChange={(checked) => setFormData({ ...formData, acceptTerms: checked as boolean })}
+                        className="mt-1 rounded border-gray-300"
+                      />
+                      <Label htmlFor="terms" className="text-sm text-gray-600 leading-relaxed">
+                        I agree to the{" "}
+                        <Link href="/terms" className="text-black hover:underline font-medium">
+                          Terms of Service
+                        </Link>{" "}
+                        and{" "}
+                        <Link href="/privacy" className="text-black hover:underline font-medium">
+                          Privacy Policy
+                        </Link>
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        id="remember"
+                        checked={formData.rememberMe}
+                        onCheckedChange={(checked) => setFormData({ ...formData, rememberMe: checked as boolean })}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor="remember" className="text-sm text-gray-600">
+                        Keep me signed in
+                      </Label>
+                    </div>
                   </div>
 
                   {/* Send OTP Button */}
@@ -306,9 +386,11 @@ export default function LoginPage() {
 
               {step === "otp" && (
                 <form onSubmit={handleVerifyOtp} className="space-y-6">
-                  {/* Phone Display */}
+                  {/* User Details Display */}
                   <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                    <p className="text-sm text-gray-600">Signing in with:</p>
+                    <p className="text-sm text-gray-600">Creating account for:</p>
+                    <p className="font-medium text-gray-900">{formData.name}</p>
+                    <p className="font-medium text-gray-900">{formData.email}</p>
                     <p className="font-medium text-gray-900">{formData.phone}</p>
                     <p className="text-xs text-green-600 mt-1">✅ Real SMS sent via Firebase</p>
                   </div>
@@ -344,17 +426,17 @@ export default function LoginPage() {
                       {loading ? (
                         <div className="flex items-center">
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                          Signing In...
+                          Creating Account...
                         </div>
                       ) : (
-                        "Verify & Sign In"
+                        "Verify & Create Account"
                       )}
                     </Button>
 
                     <div className="flex space-x-4">
                       <Button
                         type="button"
-                        onClick={handleBackToPhone}
+                        onClick={handleBackToDetails}
                         variant="outline"
                         className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
                       >
@@ -374,12 +456,12 @@ export default function LoginPage() {
                 </form>
               )}
 
-              {/* Create Account Link */}
+              {/* Sign In Link */}
               <div className="text-center pt-6 border-t border-gray-100">
                 <p className="text-sm text-gray-600">
-                  Don't have an account?{" "}
-                  <Link href="/register" className="text-black hover:text-gray-700 font-medium">
-                    Create one now
+                  Already have an account?{" "}
+                  <Link href="/login" className="text-black hover:text-gray-700 font-medium">
+                    Sign in instead
                   </Link>
                 </p>
               </div>
