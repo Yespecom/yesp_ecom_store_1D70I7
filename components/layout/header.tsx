@@ -13,30 +13,42 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet" // Added SheetDescription
-import { Search, ShoppingCart, Heart, User, Menu, X, Plus, Minus, LogOut, Package, UserCircle, Trash2 } from 'lucide-react'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet"
+import {
+  Search,
+  ShoppingCart,
+  Heart,
+  User,
+  Menu,
+  X,
+  Plus,
+  Minus,
+  LogOut,
+  Package,
+  UserCircle,
+  Trash2,
+} from "lucide-react"
 import { useCart } from "@/lib/cart-context"
 import { toast } from "sonner"
 
-// New: Define ProductVariant interface
+// Define ProductVariant interface
 interface ProductVariant {
   _id: string
   name: string // e.g., "Red, Large"
   price: number
   originalPrice?: number
   stock?: number
-  // Add other variant-specific properties if needed, like color, size, etc.
 }
 
 interface WishlistItem {
-  _id: string // Product ID
-  name: string // Product Name
+  _id: string
+  name: string
   description?: string
   shortDescription?: string
   slug: string
   sku?: string
-  price: number // This should be the price of the selected variant, or base product price
-  originalPrice?: number // This should be the original price of the selected variant, or base product original price
+  price: number
+  originalPrice?: number
   category?: {
     _id: string
     name: string
@@ -44,7 +56,7 @@ interface WishlistItem {
   }
   gallery?: string[]
   thumbnail: string
-  stock?: number // This should be the stock of the selected variant, or base product stock
+  stock?: number
   isActive?: boolean
   isFeatured?: boolean
   tags?: string[]
@@ -56,14 +68,13 @@ interface WishlistItem {
   viewCount?: number
   createdAt?: string
   updatedAt?: string
-  selectedVariant?: ProductVariant // New: Stores details of the chosen variant
+  selectedVariant?: ProductVariant
 }
 
 interface LocalWishlist {
   items: WishlistItem[]
 }
 
-// Infer CartProduct and CartItem structure based on useCart context and new variant concept
 interface CartProduct {
   _id: string
   name: string
@@ -74,10 +85,9 @@ interface CartProduct {
   shortDescription?: string
   stock?: number
   category?: { _id: string; name: string; slug: string }
-  selectedVariant?: ProductVariant // New: The specific variant added to cart
+  selectedVariant?: ProductVariant
 }
 
-// Assuming useCart's state.items is an array of this structure
 interface CartItem {
   product: CartProduct
   quantity: number
@@ -98,9 +108,14 @@ export function Header() {
     const userData = localStorage.getItem("user_data")
     if (userData) {
       try {
-        setUser(JSON.parse(userData))
+        const parsedUser = JSON.parse(userData)
+        console.log("📱 Loaded user data:", parsedUser)
+        setUser(parsedUser)
       } catch (error) {
-        console.error("Error parsing user data:", error)
+        console.error("❌ Error parsing user data:", error)
+        // Clear invalid user data
+        localStorage.removeItem("user_data")
+        localStorage.removeItem("auth_token")
       }
     }
   }, [])
@@ -158,13 +173,12 @@ export function Header() {
     router.push("/")
   }
 
-  // Updated to pass variantId
   const handleQuantityChange = (productId: string, newQuantity: number, variantId?: string) => {
     if (newQuantity <= 0) {
-      removeItem(productId, variantId) // Pass variantId here
+      removeItem(productId, variantId)
       toast.success("Item removed from cart")
     } else {
-      updateQuantity(productId, newQuantity, variantId) // Pass variantId here
+      updateQuantity(productId, newQuantity, variantId)
     }
   }
 
@@ -175,20 +189,19 @@ export function Header() {
 
   const handleAddToCartFromWishlist = (product: WishlistItem) => {
     try {
-      // Convert wishlist item to cart-compatible format, passing selectedVariant
       const cartProduct: CartProduct = {
         _id: product._id,
         name: product.name,
-        price: getProductPrice(product), // Use the helper to get the correct price
+        price: getProductPrice(product),
         thumbnail: product.thumbnail,
         slug: product.slug,
         description: product.description,
         shortDescription: product.shortDescription,
-        stock: getProductStock(product), // Use the helper to get the correct stock
+        stock: getProductStock(product),
         category: product.category,
-        selectedVariant: product.selectedVariant, // Pass the selected variant details
+        selectedVariant: product.selectedVariant,
       }
-      addItem(cartProduct, 1, product.selectedVariant) // Pass selectedVariant object to addItem
+      addItem(cartProduct, 1, product.selectedVariant)
       toast.success(`${getProductName(product)} added to cart!`)
     } catch (error) {
       console.error("Error adding to cart:", error)
@@ -227,7 +240,7 @@ export function Header() {
     return `/products/${product.slug || product._id || "unknown"}`
   }
 
-  // Helper function to safely get product name (now considering variant)
+  // Helper function to safely get product name (considering variant)
   const getProductName = (product: WishlistItem | CartProduct) => {
     return product?.selectedVariant?.name
       ? `${product.name} (${product.selectedVariant.name})`
@@ -252,6 +265,36 @@ export function Header() {
   // Helper function to safely get product thumbnail
   const getProductThumbnail = (product: WishlistItem | CartProduct) => {
     return product?.thumbnail || "/placeholder.svg?height=60&width=60"
+  }
+
+  // Helper function to get user display name
+  const getUserDisplayName = () => {
+    if (!user) return "Guest"
+
+    // Check if it's a temporary account (auto-generated email)
+    const isTemporaryAccount = user.email && user.email.includes("@temp.oneofwun.com")
+
+    if (isTemporaryAccount) {
+      // For temporary accounts, show phone number or "Phone User"
+      return user.phone ? `${user.phone}` : "Phone User"
+    }
+
+    // For regular accounts, show name or email
+    return user.name || user.email || "User"
+  }
+
+  // Helper function to get user display email
+  const getUserDisplayEmail = () => {
+    if (!user) return ""
+
+    // Check if it's a temporary account
+    const isTemporaryAccount = user.email && user.email.includes("@temp.oneofwun.com")
+
+    if (isTemporaryAccount) {
+      return user.phone || "Phone Account"
+    }
+
+    return user.email || ""
   }
 
   return (
@@ -406,7 +449,7 @@ export function Header() {
                                 onClick={() => setIsWishlistOpen(false)}
                               >
                                 <h4 className="font-semibold text-gray-900 line-clamp-2 hover:text-red-600 transition-colors duration-200 mb-2 leading-tight">
-                                  {getProductName(item)} {/* Uses updated helper */}
+                                  {getProductName(item)}
                                 </h4>
                               </Link>
                               <div className="flex items-center justify-between mb-3">
@@ -414,11 +457,12 @@ export function Header() {
                                   <p className="text-lg font-bold text-gray-900">
                                     ₹{getProductPrice(item).toLocaleString()}
                                   </p>
-                                  {getProductOriginalPrice(item) && getProductOriginalPrice(item)! > getProductPrice(item) && (
-                                    <p className="text-sm text-gray-500 line-through">
-                                      ₹{getProductOriginalPrice(item)!.toLocaleString()}
-                                    </p>
-                                  )}
+                                  {getProductOriginalPrice(item) &&
+                                    getProductOriginalPrice(item)! > getProductPrice(item) && (
+                                      <p className="text-sm text-gray-500 line-through">
+                                        ₹{getProductOriginalPrice(item)!.toLocaleString()}
+                                      </p>
+                                    )}
                                 </div>
                               </div>
 
@@ -430,7 +474,7 @@ export function Header() {
                                   className="flex-1 h-9 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
                                 >
                                   <ShoppingCart className="h-3 w-3 mr-1" />
-                                  Add to Cart {/* Always show "Add to Cart" */}
+                                  Add to Cart
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -459,7 +503,8 @@ export function Header() {
                         <span className="font-medium">{wishlistItems.length}</span> items in wishlist
                       </div>
                       <div className="text-xs text-gray-500">
-                        Total value: ₹{wishlistItems.reduce((total, item) => total + getProductPrice(item), 0).toLocaleString()}
+                        Total value: ₹
+                        {wishlistItems.reduce((total, item) => total + getProductPrice(item), 0).toLocaleString()}
                       </div>
                     </div>
                     <Button
@@ -511,11 +556,10 @@ export function Header() {
                   ) : (
                     <div className="space-y-4">
                       {cartState.items
-                        .filter((item) => item && item.product) // Filter out invalid items
+                        .filter((item) => item && item.product)
                         .map((item) => {
                           return (
                             <div
-                              // Use a unique key that includes variant ID if present
                               key={
                                 item.product.selectedVariant
                                   ? `${item.product._id}-${item.product.selectedVariant._id}`
@@ -530,8 +574,7 @@ export function Header() {
                               />
                               <div className="flex-1 min-w-0">
                                 <h4 className="font-medium text-sm text-gray-900 line-clamp-2 mb-1">
-                                  {getProductName(item.product)}{" "}
-                                  {/* Display variant name if present */}
+                                  {getProductName(item.product)}
                                 </h4>
                                 <p className="text-sm text-gray-600 mb-3">
                                   ₹{(getProductPrice(item.product) || 0).toLocaleString()}
@@ -545,7 +588,7 @@ export function Header() {
                                         handleQuantityChange(
                                           item.product._id || "",
                                           item.quantity - 1,
-                                          item.product.selectedVariant?._id, // Pass variantId
+                                          item.product.selectedVariant?._id,
                                         )
                                       }
                                       className="h-8 w-8 p-0 hover:bg-gray-100"
@@ -560,7 +603,7 @@ export function Header() {
                                         handleQuantityChange(
                                           item.product._id || "",
                                           item.quantity + 1,
-                                          item.product.selectedVariant?._id, // Pass variantId
+                                          item.product.selectedVariant?._id,
                                         )
                                       }
                                       className="h-8 w-8 p-0 hover:bg-gray-100"
@@ -644,8 +687,8 @@ export function Header() {
                           <UserCircle className="h-6 w-6 text-gray-600" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                          <p className="text-sm font-medium text-gray-900 truncate">{getUserDisplayName()}</p>
+                          <p className="text-xs text-gray-500 truncate">{getUserDisplayEmail()}</p>
                         </div>
                       </div>
                     </div>
@@ -711,8 +754,8 @@ export function Header() {
                           <UserCircle className="h-7 w-7 text-gray-600" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{user.name}</p>
-                          <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                          <p className="font-medium text-gray-900 truncate">{getUserDisplayName()}</p>
+                          <p className="text-sm text-gray-500 truncate">{getUserDisplayEmail()}</p>
                         </div>
                       </div>
                     </div>
