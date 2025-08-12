@@ -19,7 +19,7 @@ import {
 } from "@/lib/otp-auth"
 import { ArrowLeft, Phone, Shield } from "lucide-react"
 
-const RECAPTCHA_SITE_KEY = "6LfemqMrAAAAAKPE4E9SMFcRZKolPLp7N4jiearD" // This is a test key, replace with your actual key
+const RECAPTCHA_SITE_KEY = "6LfemqMrAAAAAKPE4E9SMFcRZKolPLp7N4jiearD" // Correct site key for frontend
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
