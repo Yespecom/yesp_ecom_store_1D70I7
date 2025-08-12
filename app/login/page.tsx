@@ -14,7 +14,8 @@ import { Recaptcha } from "@/components/ui/recaptcha"
 import { requestPhoneOtp, verifyPhoneOtp, isValidE164Phone } from "@/lib/otp-auth"
 import { ArrowLeft, Phone, Shield } from "lucide-react"
 
-const RECAPTCHA_SITE_KEY = "6LfemqMrAAAAAKPE4E9SMFcRZKolPLp7N4jiearD"
+// Use environment variable or fallback to test key
+const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -146,7 +147,7 @@ export default function LoginPage() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url("/images/models-banner.jpg")`,
+            backgroundImage: `url("/placeholder.svg?height=800&width=600")`,
           }}
         />
         <div className="absolute inset-0 bg-black/40" />
@@ -191,7 +192,7 @@ export default function LoginPage() {
               {/* Logo */}
               <Link href="/" className="flex items-center justify-center space-x-3 mb-6">
                 <div className="relative w-12 h-8">
-                  <Image src="/images/oneofwun-logo.png" alt="oneofwun" fill className="object-contain" />
+                  <Image src="/placeholder.svg?height=32&width=48" alt="oneofwun" fill className="object-contain" />
                 </div>
                 <span className="text-2xl font-bold text-gray-900">oneofwun</span>
               </Link>
