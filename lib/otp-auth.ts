@@ -1,13 +1,13 @@
 const OTP_DOMAIN = "https://api.yespstudio.com"
 export const STORE_ID = "1D70I7"
-const OTP_BASE = `${OTP_DOMAIN}/api/${STORE_ID}/auth/otp`
+const OTP_BASE = `${OTP_DOMAIN}/api/${STORE_ID}/firebase-otp`
 
 export type OtpPurpose = "login" | "registration"
 export type OtpChannel = "sms" | "call"
 
 export interface OtpRequestSuccess {
   message: string
-  provider: "twilio-verify" | "sms" | "fast2sms" | string
+  provider: "firebase" | "twilio-verify" | "sms" | "fast2sms" | string
   purpose: OtpPurpose
   status?: "pending" | "sent" | string
   expiresIn?: string
@@ -89,9 +89,20 @@ export async function requestPhoneOtp(params: {
   purpose?: OtpPurpose
   channel?: OtpChannel
   storeId?: string
+  name?: string
 }): Promise<OtpRequestSuccess> {
-  const { phone, purpose = "login", channel = "sms", storeId = STORE_ID } = params
-  const url = `${OTP_DOMAIN}/api/${storeId}/auth/otp/request`
+  const { phone, purpose = "login", channel = "sms", storeId = STORE_ID, name } = params
+  const url = `${OTP_DOMAIN}/api/${storeId}/firebase-otp/send-otp`
+
+  const requestBody: any = {
+    phone,
+    purpose,
+  }
+
+  // Add name for registration
+  if (purpose === "registration" && name) {
+    requestBody.name = name
+  }
 
   const res = await fetch(url, {
     method: "POST",
@@ -99,16 +110,13 @@ export async function requestPhoneOtp(params: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({ phone, purpose, channel }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!res.ok) {
     throw await parseError(res)
   }
 
-  // Success shapes:
-  // { message, provider: 'twilio-verify', status: 'pending', purpose, expiresIn }
-  // { message, provider: 'sms', purpose, expiresIn, dev?: { code } }
   const data = (await res.json()) as OtpRequestSuccess
   return data
 }
@@ -122,7 +130,19 @@ export async function verifyPhoneOtp(params: {
   storeId?: string
 }): Promise<OtpVerifySuccess> {
   const { phone, otp, purpose = "login", name, rememberMe = true, storeId = STORE_ID } = params
-  const url = `${OTP_DOMAIN}/api/${storeId}/auth/otp/verify`
+  const url = `${OTP_DOMAIN}/api/${storeId}/firebase-otp/verify-otp`
+
+  const requestBody: any = {
+    phone,
+    otp,
+    purpose,
+    rememberMe,
+  }
+
+  // Add name for registration
+  if (purpose === "registration" && name) {
+    requestBody.name = name
+  }
 
   const res = await fetch(url, {
     method: "POST",
@@ -130,15 +150,13 @@ export async function verifyPhoneOtp(params: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({ phone, otp, purpose, name, rememberMe }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!res.ok) {
     throw await parseError(res)
   }
 
-  // Success shape:
-  // { message, method: "phone_otp", token, customer, storeId, tenantId, tokenInfo, expiresIn }
   const data = (await res.json()) as OtpVerifySuccess
   return data
 }
