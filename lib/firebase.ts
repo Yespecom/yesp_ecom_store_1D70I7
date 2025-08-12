@@ -1,6 +1,6 @@
-import { initializeApp } from "firebase/app"
+import { initializeApp, getApps } from "firebase/app"
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"
-import type { ConfirmationResult } from "firebase/auth"
+import type { Auth } from "firebase/auth"
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -9,23 +9,27 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
-const app = initializeApp(firebaseConfig)
-export const auth = getAuth(app)
+// Initialize Firebase
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
+const auth: Auth = getAuth(app)
 
 // Create reCAPTCHA verifier
-export const createRecaptchaVerifier = (containerId = "recaptcha-container") => {
-  return new RecaptchaVerifier(auth, containerId, {
-    size: "invisible",
-    callback: (response: string) => {
-      console.log("✅ reCAPTCHA solved:", response.substring(0, 20) + "...")
-    },
-    "expired-callback": () => {
-      console.log("❌ reCAPTCHA expired")
-    },
-  })
+export const createRecaptchaVerifier = (containerId: string) => {
+  if (typeof window !== "undefined") {
+    return new RecaptchaVerifier(auth, containerId, {
+      size: "normal",
+      callback: () => {
+        console.log("reCAPTCHA solved")
+      },
+      "expired-callback": () => {
+        console.log("reCAPTCHA expired")
+      },
+    })
+  }
+  throw new Error("RecaptchaVerifier can only be used in browser environment")
 }
 
-export { signInWithPhoneNumber, type ConfirmationResult }
+export { auth, signInWithPhoneNumber }
+export default app
