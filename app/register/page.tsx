@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
-import { ArrowLeft, Phone, Shield, User } from "lucide-react"
+import { ArrowLeft, Phone, Shield, User, AlertCircle } from "lucide-react"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -235,6 +235,25 @@ export default function RegisterPage() {
                 </div>
               )}
 
+              {/* Firebase Configuration Warning */}
+              {error.includes("authorized domain") && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    <div className="text-sm text-yellow-800">
+                      <p className="font-medium mb-2">Firebase Configuration Required</p>
+                      <p className="mb-2">To enable phone authentication, please:</p>
+                      <ol className="list-decimal list-inside space-y-1 text-xs">
+                        <li>Go to Firebase Console → Authentication → Settings</li>
+                        <li>Add your domain to "Authorized domains"</li>
+                        <li>Enable Phone authentication in Sign-in methods</li>
+                        <li>Configure your Firebase project settings</li>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {step === "details" && (
                 <form onSubmit={handleSendOtp} className="space-y-6">
                   {/* Name Field */}
@@ -279,7 +298,11 @@ export default function RegisterPage() {
                   {/* Firebase reCAPTCHA Container */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
-                    <div id="recaptcha-container" className="flex justify-center"></div>
+                    <div
+                      id="recaptcha-container"
+                      className="flex justify-center min-h-[78px] items-center border border-gray-200 rounded-lg bg-gray-50"
+                    ></div>
+                    <p className="text-xs text-gray-500">Complete the security check to continue</p>
                   </div>
 
                   {/* Terms and Conditions */}
