@@ -1,147 +1,147 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react"
 
 interface RecaptchaProps {
   siteKey: string
   onVerify: (token: string) => void
-  onError?: (error: string) => void
+  onError: (error: string) => void
   onExpired?: () => void
   theme?: "light" | "dark"
   size?: "compact" | "normal"
-  className?: string
+  tabindex?: number
+}
+
+export interface RecaptchaRef {
+  reset: () => void
+  execute: () => void
 }
 
 declare global {
   interface Window {
     grecaptcha: {
-      render: (container: string | HTMLElement, options: any) => number
+      ready: (callback: () => void) => void
+      render: (
+        container: string | HTMLElement,
+        parameters: {
+          sitekey: string
+          callback?: (token: string) => void
+          "expired-callback"?: () => void
+          "error-callback"?: () => void
+          theme?: "light" | "dark"
+          size?: "compact" | "normal"
+          tabindex?: number
+        },
+      ) => number
       reset: (widgetId?: number) => void
+      execute: (widgetId?: number) => void
       getResponse: (widgetId?: number) => string
     }
   }
 }
 
-export function Recaptcha({
-  siteKey,
-  onVerify,
-  onError,
-  onExpired,
-  theme = "light",
-  size = "normal",
-  className = "",
-}: RecaptchaProps) {
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const recaptchaRef = useRef<HTMLDivElement>(null)
-  const widgetIdRef = useRef<number | null>(null)
+export const Recaptcha = forwardRef<RecaptchaRef, RecaptchaProps>(
+  ({ siteKey, onVerify, onError, onExpired, theme = "light", size = "normal", tabindex }, ref) => {
+    const containerRef = useRef<HTMLDivElement>(null)
+    const widgetIdRef = useRef<number | null>(null)
+    const scriptLoadedRef = useRef(false)
 
-  useEffect(() => {
-    // Check if reCAPTCHA script is already loaded
-    const checkRecaptcha = () => {
-      if (window.grecaptcha && recaptchaRef.current && widgetIdRef.current === null) {
-        try {
-          widgetIdRef.current = window.grecaptcha.render(recaptchaRef.current, {
+    useImperativeHandle(ref, () => ({
+      reset: () => {
+        if (widgetIdRef.current !== null && window.grecaptcha) {
+          window.grecaptcha.reset(widgetIdRef.current)
+        }
+      },
+      execute: () => {
+        if (widgetIdRef.current !== null && window.grecaptcha) {
+          window.grecaptcha.execute(widgetIdRef.current)
+        }
+      },
+    }))
+
+    const loadRecaptchaScript = (): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        if (scriptLoadedRef.current || (typeof window !== "undefined" && window.grecaptcha)) {
+          scriptLoadedRef.current = true
+          resolve()
+          return
+        }
+
+        const script = document.createElement("script")
+        script.src = "https://www.google.com/recaptcha/api.js"
+        script.async = true
+        script.defer = true
+        script.onload = () => {
+          scriptLoadedRef.current = true
+          resolve()
+        }
+        script.onerror = () => {
+          reject(new Error("Failed to load reCAPTCHA script"))
+        }
+        document.head.appendChild(script)
+      })
+    }
+
+    const renderRecaptcha = () => {
+      if (!containerRef.current || !window.grecaptcha) return
+
+      try {
+        window.grecaptcha.ready(() => {
+          if (!containerRef.current) return
+
+          widgetIdRef.current = window.grecaptcha.render(containerRef.current, {
             sitekey: siteKey,
-            theme,
-            size,
             callback: (token: string) => {
-              setError(null)
               onVerify(token)
             },
-            "error-callback": () => {
-              const errorMsg = "reCAPTCHA verification failed"
-              setError(errorMsg)
-              onError?.(errorMsg)
-            },
             "expired-callback": () => {
-              const errorMsg = "reCAPTCHA expired, please try again"
-              setError(errorMsg)
-              onExpired?.()
+              if (onExpired) onExpired()
             },
+            "error-callback": () => {
+              onError("reCAPTCHA verification failed")
+            },
+            theme,
+            size,
+            tabindex,
           })
-          setIsLoaded(true)
-        } catch (err) {
-          const errorMsg = "Failed to render reCAPTCHA widget"
-          setError(errorMsg)
-          onError?.(errorMsg)
-        }
+        })
+      } catch (error) {
+        console.error("reCAPTCHA render error:", error)
+        onError("Failed to render reCAPTCHA")
       }
     }
 
-    // If grecaptcha is already available, render immediately
-    if (window.grecaptcha) {
-      checkRecaptcha()
-    } else {
-      // Wait for the script to load (it's loaded in layout.tsx)
-      const interval = setInterval(() => {
-        if (window.grecaptcha) {
-          checkRecaptcha()
-          clearInterval(interval)
+    useEffect(() => {
+      const initRecaptcha = async () => {
+        try {
+          await loadRecaptchaScript()
+          renderRecaptcha()
+        } catch (error) {
+          console.error("reCAPTCHA initialization error:", error)
+          onError("reCAPTCHA failed to load")
         }
-      }, 100)
+      }
 
-      // Cleanup interval after 10 seconds
-      const timeout = setTimeout(() => {
-        clearInterval(interval)
-        if (!window.grecaptcha) {
-          const errorMsg = "reCAPTCHA failed to load"
-          setError(errorMsg)
-          onError?.(errorMsg)
-        }
-      }, 10000)
+      initRecaptcha()
 
       return () => {
-        clearInterval(interval)
-        clearTimeout(timeout)
-      }
-    }
-
-    // Cleanup function
-    return () => {
-      if (widgetIdRef.current !== null && window.grecaptcha) {
-        try {
-          window.grecaptcha.reset(widgetIdRef.current)
-        } catch (e) {
-          // Ignore cleanup errors
+        // Cleanup is handled by the script removal when component unmounts
+        if (widgetIdRef.current !== null && window.grecaptcha) {
+          try {
+            window.grecaptcha.reset(widgetIdRef.current)
+          } catch (error) {
+            console.error("reCAPTCHA cleanup error:", error)
+          }
         }
       }
-    }
-  }, [siteKey, theme, size, onVerify, onError, onExpired])
+    }, [siteKey])
 
-  const resetRecaptcha = () => {
-    if (window.grecaptcha && widgetIdRef.current !== null) {
-      try {
-        window.grecaptcha.reset(widgetIdRef.current)
-        setError(null)
-      } catch (err) {
-        const errorMsg = "Failed to reset reCAPTCHA"
-        setError(errorMsg)
-        onError?.(errorMsg)
-      }
-    }
-  }
+    return (
+      <div className="recaptcha-container">
+        <div ref={containerRef} className="g-recaptcha" />
+      </div>
+    )
+  },
+)
 
-  const getResponse = () => {
-    if (window.grecaptcha && widgetIdRef.current !== null) {
-      return window.grecaptcha.getResponse(widgetIdRef.current)
-    }
-    return ""
-  }
-
-  return (
-    <div className={className}>
-      {!isLoaded && !error && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground p-4 border border-gray-200 rounded">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading security verification...
-        </div>
-      )}
-
-      {error && <div className="text-sm text-red-600 mb-2 p-3 bg-red-50 border border-red-200 rounded">{error}</div>}
-
-      <div ref={recaptchaRef} className="flex justify-center" />
-    </div>
-  )
-}
+Recaptcha.displayName = "Recaptcha"
