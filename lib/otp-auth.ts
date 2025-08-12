@@ -95,18 +95,24 @@ export async function requestPhoneOtp(params: {
   const { phone, purpose = "login", channel = "sms", storeId = STORE_ID, name, recaptchaToken } = params
   const url = `${OTP_DOMAIN}/api/${storeId}/firebase-otp/send-otp`
 
+  // Validate required parameters
+  if (!phone || !phone.trim()) {
+    throw new Error("Phone number is required")
+  }
+
+  if (!recaptchaToken || !recaptchaToken.trim()) {
+    throw new Error("reCAPTCHA token is required")
+  }
+
   const requestBody: any = {
-    phone,
+    phone: phone.trim(),
     purpose,
+    recaptchaToken: recaptchaToken.trim(),
   }
 
   // Add name for registration
   if (purpose === "registration" && name) {
-    requestBody.name = name
-  }
-
-  if (recaptchaToken) {
-    requestBody.recaptchaToken = recaptchaToken
+    requestBody.name = name.trim()
   }
 
   const res = await fetch(url, {
@@ -137,16 +143,25 @@ export async function verifyPhoneOtp(params: {
   const { phone, otp, purpose = "login", name, rememberMe = true, storeId = STORE_ID } = params
   const url = `${OTP_DOMAIN}/api/${storeId}/firebase-otp/verify-otp`
 
+  // Validate required parameters
+  if (!phone || !phone.trim()) {
+    throw new Error("Phone number is required")
+  }
+
+  if (!otp || !otp.trim()) {
+    throw new Error("OTP is required")
+  }
+
   const requestBody: any = {
-    phone,
-    otp,
+    phone: phone.trim(),
+    otp: otp.trim(),
     purpose,
     rememberMe,
   }
 
   // Add name for registration
   if (purpose === "registration" && name) {
-    requestBody.name = name
+    requestBody.name = name.trim()
   }
 
   const res = await fetch(url, {
