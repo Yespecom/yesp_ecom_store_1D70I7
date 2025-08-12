@@ -1,6 +1,7 @@
 "use client"
 
-import { auth, createRecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from "./firebase"
+import { auth, createRecaptchaVerifier, signInWithPhoneNumber } from "./firebase"
+import type { ConfirmationResult } from "firebase/auth"
 
 export type { ConfirmationResult }
 
@@ -75,17 +76,19 @@ export const verifyFirebaseOTP = async (
 
     console.log("✅ Firebase OTP verified, sending to server...")
 
-    // Send ID token to your server for verification
-    const response = await fetch("/api/1D70I7/firebase-otp/verify-firebase-token", {
+    // Send to your existing verify-otp endpoint with Firebase token
+    const response = await fetch("https://api.yespstudio.com/api/1D70I7/verify-otp", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         phone: phone,
-        firebaseIdToken: idToken,
+        otp: "FIREBASE_VERIFIED", // Special marker to indicate Firebase verification
         purpose: purpose,
         name: name,
+        firebaseIdToken: idToken, // Include Firebase ID token for server verification
+        firebaseVerified: true, // Flag to indicate this came from Firebase
       }),
     })
 
@@ -96,10 +99,10 @@ export const verifyFirebaseOTP = async (
       return {
         success: true,
         token: data.token,
-        customer: data.customer,
+        customer: data.customer || data.user,
       }
     } else {
-      throw new Error(data.error || "Server verification failed")
+      throw new Error(data.error || data.message || "Server verification failed")
     }
   } catch (error: any) {
     console.error("❌ Error verifying Firebase OTP:", error)
