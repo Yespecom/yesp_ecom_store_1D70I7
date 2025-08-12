@@ -69,7 +69,14 @@ export default function LoginPage() {
 
     try {
       console.log("Verifying Firebase OTP for login...")
-      const result = await verifyFirebaseOTP(confirmationResult, formData.otp, formData.phone, "login")
+      const result = await verifyFirebaseOTP(
+        confirmationResult,
+        formData.otp,
+        formData.phone,
+        "login",
+        undefined, // name not required for login
+        undefined, // email not required for login, will be auto-generated
+      )
 
       if (result.success && result.token && result.customer) {
         console.log("Login successful")
