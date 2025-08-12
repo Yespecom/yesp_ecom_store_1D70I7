@@ -1,11 +1,12 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import { CartProvider } from '@/lib/cart-context'
-import { WishlistProvider } from '@/lib/wishlist-context'
-import { Toaster } from '@/components/ui/sonner'
-import { Header } from '@/components/layout/header' // Ensure Header is imported
-import { ChunkErrorHandler } from '@/components/chunk-error-handler' // This component handles useEffect
+import type React from "react"
+import type { Metadata } from "next"
+import { Inter } from "next/font/google"
+import "./globals.css"
+import { CartProvider } from "@/lib/cart-context"
+import { WishlistProvider } from "@/lib/wishlist-context"
+import { Toaster } from "@/components/ui/sonner"
+import { Header } from "@/components/layout/header"
+import { ChunkErrorHandler } from "@/components/chunk-error-handler"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -107,7 +108,7 @@ export const metadata: Metadata = {
   category: "fashion",
   classification: "Business",
   other: {
-    "theme-color": "#dc2626", // Red color from your CTA buttons
+    "theme-color": "#dc2626",
     "color-scheme": "light",
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
@@ -127,11 +128,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Additional SEO and performance tags */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-        {/* Structured Data - JSON-LD */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
