@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
-import { ArrowLeft, Phone, Shield } from "lucide-react"
+import { ArrowLeft, Phone, Shield, AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -134,20 +134,24 @@ export default function LoginPage() {
           <div className="max-w-md text-center">
             <h1 className="text-4xl font-bold mb-6">Welcome Back</h1>
             <p className="text-lg text-gray-200 mb-8">
-              Sign in to your oneofwun account using your phone number for secure access.
+              Sign in to your oneofwun account and continue your fashion journey.
             </p>
-            <div className="flex items-center justify-center space-x-8 text-sm">
-              <div className="text-center">
-                <div className="text-2xl font-bold">10K+</div>
-                <div className="text-gray-300">Happy Customers</div>
+            <div className="space-y-4 text-left">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+                <span>Access your order history</span>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">500+</div>
-                <div className="text-gray-300">Premium Products</div>
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+                <span>Track your current orders</span>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">4.9★</div>
-                <div className="text-gray-300">Customer Rating</div>
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+                <span>Manage your wishlist</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+                <span>Get personalized recommendations</span>
               </div>
             </div>
           </div>
@@ -183,8 +187,14 @@ export default function LoginPage() {
 
               <CardTitle className="text-2xl font-bold text-gray-900">Sign In</CardTitle>
               <CardDescription className="text-gray-600">
-                {step === "phone" ? "Enter your phone number to receive an OTP" : "Enter the OTP sent to your phone"}
+                {step === "phone" ? "Enter your phone number to continue" : "Enter the OTP sent to your phone"}
               </CardDescription>
+
+              {/* Progress Indicator */}
+              <div className="flex items-center justify-center space-x-2 mt-6">
+                <div className={`w-8 h-2 rounded-full ${step === "phone" ? "bg-black" : "bg-gray-200"}`}></div>
+                <div className={`w-8 h-2 rounded-full ${step === "otp" ? "bg-black" : "bg-gray-200"}`}></div>
+              </div>
             </CardHeader>
 
             <CardContent className="space-y-6">
@@ -202,6 +212,25 @@ export default function LoginPage() {
                     }`}
                   ></div>
                   {error}
+                </div>
+              )}
+
+              {/* Firebase Configuration Warning */}
+              {error.includes("authorized domain") && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    <div className="text-sm text-yellow-800">
+                      <p className="font-medium mb-2">Firebase Configuration Required</p>
+                      <p className="mb-2">To enable phone authentication, please:</p>
+                      <ol className="list-decimal list-inside space-y-1 text-xs">
+                        <li>Go to Firebase Console → Authentication → Settings</li>
+                        <li>Add your domain to "Authorized domains"</li>
+                        <li>Enable Phone authentication in Sign-in methods</li>
+                        <li>Configure your Firebase project settings</li>
+                      </ol>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -230,11 +259,15 @@ export default function LoginPage() {
                   {/* Firebase reCAPTCHA Container */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
-                    <div id="recaptcha-container" className="flex justify-center"></div>
+                    <div
+                      id="recaptcha-container"
+                      className="flex justify-center min-h-[78px] items-center border border-gray-200 rounded-lg bg-gray-50"
+                    ></div>
+                    <p className="text-xs text-gray-500">Complete the security check to continue</p>
                   </div>
 
                   {/* Remember Me */}
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <Checkbox
                       id="remember"
                       checked={formData.rememberMe}
@@ -267,8 +300,8 @@ export default function LoginPage() {
               {step === "otp" && (
                 <form onSubmit={handleVerifyOtp} className="space-y-6">
                   {/* Phone Display */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600">OTP sent to:</p>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                    <p className="text-sm text-gray-600">Signing in with:</p>
                     <p className="font-medium text-gray-900">{formData.phone}</p>
                     <p className="text-xs text-green-600 mt-1">✅ Real SMS sent via Firebase</p>
                   </div>
@@ -304,7 +337,7 @@ export default function LoginPage() {
                       {loading ? (
                         <div className="flex items-center">
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                          Verifying...
+                          Signing In...
                         </div>
                       ) : (
                         "Verify & Sign In"
@@ -318,7 +351,7 @@ export default function LoginPage() {
                         variant="outline"
                         className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
                       >
-                        Change Number
+                        Back
                       </Button>
                       <Button
                         type="button"
@@ -334,7 +367,7 @@ export default function LoginPage() {
                 </form>
               )}
 
-              {/* Sign Up Link */}
+              {/* Create Account Link */}
               <div className="text-center pt-6 border-t border-gray-100">
                 <p className="text-sm text-gray-600">
                   Don't have an account?{" "}
@@ -345,20 +378,6 @@ export default function LoginPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Footer */}
-          <div className="text-center mt-8 text-xs text-gray-500">
-            <p>
-              By signing in, you agree to our{" "}
-              <Link href="/terms" className="text-black hover:underline">
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy" className="text-black hover:underline">
-                Privacy Policy
-              </Link>
-            </p>
-          </div>
         </div>
       </div>
     </div>
