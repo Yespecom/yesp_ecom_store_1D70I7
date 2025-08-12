@@ -14,7 +14,7 @@ import { Recaptcha } from "@/components/ui/recaptcha"
 import { requestPhoneOtp, verifyPhoneOtp, isValidE164Phone } from "@/lib/otp-auth"
 import { ArrowLeft, Phone, Shield } from "lucide-react"
 
-// Use environment variable or fallback to test key
+// Use environment variable or fallback to Google's test key
 const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
 
 export default function LoginPage() {
@@ -31,11 +31,13 @@ export default function LoginPage() {
   const router = useRouter()
 
   const handleRecaptchaVerify = (token: string) => {
+    console.log("reCAPTCHA verified:", token.substring(0, 20) + "...")
     setRecaptchaToken(token)
     setError("")
   }
 
   const handleRecaptchaError = (error: string) => {
+    console.error("reCAPTCHA error:", error)
     setRecaptchaToken("")
     setError(error)
   }
@@ -60,18 +62,23 @@ export default function LoginPage() {
     }
 
     try {
+      console.log("Sending OTP request...")
       await requestPhoneOtp({
         phone: formData.phone,
         purpose: "login",
         channel: "sms",
         recaptchaToken,
       })
+      console.log("OTP sent successfully")
       setStep("otp")
     } catch (error: any) {
       console.error("OTP request failed:", error)
       setError(error.message || "Failed to send OTP")
       // Reset reCAPTCHA on error
       setRecaptchaToken("")
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset()
+      }
     } finally {
       setLoading(false)
     }
@@ -83,6 +90,7 @@ export default function LoginPage() {
     setError("")
 
     try {
+      console.log("Verifying OTP...")
       const response = await verifyPhoneOtp({
         phone: formData.phone,
         otp: formData.otp,
@@ -91,6 +99,7 @@ export default function LoginPage() {
       })
 
       if (response.token && response.customer) {
+        console.log("Login successful")
         // Store authentication data
         localStorage.setItem("auth_token", response.token)
         localStorage.setItem("user_data", JSON.stringify(response.customer))
@@ -111,6 +120,9 @@ export default function LoginPage() {
     setStep("phone")
     setError("")
     setRecaptchaToken("")
+    if (recaptchaRef.current) {
+      recaptchaRef.current.reset()
+    }
   }
 
   const handleResendOtp = async () => {
@@ -135,6 +147,9 @@ export default function LoginPage() {
       console.error("OTP resend failed:", error)
       setError(error.message || "Failed to resend OTP")
       setRecaptchaToken("")
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset()
+      }
     } finally {
       setLoading(false)
     }
@@ -147,7 +162,7 @@ export default function LoginPage() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url("/placeholder.svg?height=800&width=600")`,
+            backgroundImage: `url("/placeholder.svg?height=800&width=600&text=Welcome+Back")`,
           }}
         />
         <div className="absolute inset-0 bg-black/40" />
@@ -192,7 +207,12 @@ export default function LoginPage() {
               {/* Logo */}
               <Link href="/" className="flex items-center justify-center space-x-3 mb-6">
                 <div className="relative w-12 h-8">
-                  <Image src="/placeholder.svg?height=32&width=48" alt="oneofwun" fill className="object-contain" />
+                  <Image
+                    src="/placeholder.svg?height=32&width=48&text=Logo"
+                    alt="oneofwun"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
                 <span className="text-2xl font-bold text-gray-900">oneofwun</span>
               </Link>
