@@ -83,39 +83,63 @@ export const Recaptcha = forwardRef<RecaptchaRef, RecaptchaProps>(
     }
 
     const renderRecaptcha = () => {
-      if (!containerRef.current || !window.grecaptcha) return
+      if (!containerRef.current || !window.grecaptcha || !siteKey) {
+        if (!siteKey) {
+          onError("reCAPTCHA site key is missing")
+        }
+        return
+      }
+
+      // Clear any existing widget
+      if (containerRef.current) {
+        containerRef.current.innerHTML = ""
+      }
 
       try {
         window.grecaptcha.ready(() => {
-          if (!containerRef.current) return
+          if (!containerRef.current || !siteKey) return
 
-          widgetIdRef.current = window.grecaptcha.render(containerRef.current, {
-            sitekey: siteKey,
-            callback: (token: string) => {
-              onVerify(token)
-            },
-            "expired-callback": () => {
-              if (onExpired) onExpired()
-            },
-            "error-callback": () => {
-              onError("reCAPTCHA verification failed")
-            },
-            theme,
-            size,
-            tabindex,
-          })
+          try {
+            widgetIdRef.current = window.grecaptcha.render(containerRef.current, {
+              sitekey: siteKey,
+              callback: (token: string) => {
+                onVerify(token)
+              },
+              "expired-callback": () => {
+                if (onExpired) onExpired()
+              },
+              "error-callback": () => {
+                onError("reCAPTCHA verification failed")
+              },
+              theme,
+              size,
+              tabindex,
+            })
+          } catch (renderError) {
+            console.error("reCAPTCHA render error:", renderError)
+            onError("Failed to render reCAPTCHA widget")
+          }
         })
       } catch (error) {
-        console.error("reCAPTCHA render error:", error)
-        onError("Failed to render reCAPTCHA")
+        console.error("reCAPTCHA initialization error:", error)
+        onError("Failed to initialize reCAPTCHA")
       }
     }
 
     useEffect(() => {
+      // Validate siteKey
+      if (!siteKey || siteKey.trim() === "") {
+        onError("reCAPTCHA site key is required")
+        return
+      }
+
       const initRecaptcha = async () => {
         try {
           await loadRecaptchaScript()
-          renderRecaptcha()
+          // Add a small delay to ensure the script is fully loaded
+          setTimeout(() => {
+            renderRecaptcha()
+          }, 100)
         } catch (error) {
           console.error("reCAPTCHA initialization error:", error)
           onError("reCAPTCHA failed to load")
@@ -125,7 +149,7 @@ export const Recaptcha = forwardRef<RecaptchaRef, RecaptchaProps>(
       initRecaptcha()
 
       return () => {
-        // Cleanup is handled by the script removal when component unmounts
+        // Cleanup
         if (widgetIdRef.current !== null && window.grecaptcha) {
           try {
             window.grecaptcha.reset(widgetIdRef.current)
@@ -135,6 +159,16 @@ export const Recaptcha = forwardRef<RecaptchaRef, RecaptchaProps>(
         }
       }
     }, [siteKey])
+
+    // Show a placeholder if no siteKey is provided
+    if (!siteKey || siteKey.trim() === "") {
+      return (
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center text-gray-500">
+          <p className="text-sm">reCAPTCHA site key not configured</p>
+          <p className="text-xs mt-1">Please set NEXT_PUBLIC_RECAPTCHA_SITE_KEY environment variable</p>
+        </div>
+      )
+    }
 
     return (
       <div className="recaptcha-container">
