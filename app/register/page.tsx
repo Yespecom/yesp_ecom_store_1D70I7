@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
+import { sendFirebaseOTP, verifyFirebaseOTP, checkUserExists, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
 import { initializeRecaptchaV3 } from "@/lib/firebase"
 import { ArrowLeft, User, Mail, Phone, Shield, AlertCircle } from "lucide-react"
@@ -47,6 +47,14 @@ export default function RegisterPage() {
       initRecaptcha()
     }
   }, [step])
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const phoneParam = urlParams.get("phone")
+    if (phoneParam) {
+      setFormData((prev) => ({ ...prev, phone: phoneParam }))
+    }
+  }, [])
 
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,7 +101,19 @@ export default function RegisterPage() {
     setError("")
 
     try {
-      console.log("Sending Firebase OTP for registration...")
+      console.log("Checking if user already exists...")
+      const userCheck = await checkUserExists(formData.phone)
+
+      if (userCheck.exists) {
+        setError("Account already exists. Redirecting to login...")
+        setTimeout(() => {
+          router.push(`/login?phone=${encodeURIComponent(formData.phone)}`)
+        }, 2000)
+        setLoading(false)
+        return
+      }
+
+      console.log("✅ New user, sending Firebase OTP for registration...")
       const result = await sendFirebaseOTP(formData.phone)
 
       if (result.success && result.confirmationResult) {
@@ -134,11 +154,18 @@ export default function RegisterPage() {
       )
 
       if (result.success && result.token && result.customer) {
-        console.log("Registration successful")
+        console.log("✅ Registration successful")
+        console.log("Customer data:", result.customer)
+
         localStorage.setItem("auth_token", result.token)
         localStorage.setItem("user_data", JSON.stringify(result.customer))
+
         window.dispatchEvent(new Event("storage"))
-        router.push("/")
+
+        setError("Registration successful! Welcome to oneofwun!")
+        setTimeout(() => {
+          router.push("/")
+        }, 1500)
       } else {
         throw new Error(result.error || "Failed to verify OTP")
       }
