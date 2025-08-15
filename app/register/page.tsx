@@ -253,7 +253,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col lg:flex-row">
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -290,20 +290,20 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-md">
           <Link
             href="/"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-8 transition-colors"
+            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6 sm:mb-8 transition-colors"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Home
           </Link>
 
-          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
-            <CardHeader className="text-center pb-8">
-              <Link href="/" className="flex items-center justify-center space-x-3 mb-6">
-                <div className="relative w-12 h-8">
+          <Card className="border-0 shadow-lg sm:shadow-xl bg-white/90 sm:bg-white/80 backdrop-blur-sm">
+            <CardHeader className="text-center pb-6 sm:pb-8 px-4 sm:px-6">
+              <Link href="/" className="flex items-center justify-center space-x-3 mb-4 sm:mb-6">
+                <div className="relative w-10 h-7 sm:w-12 sm:h-8">
                   <Image
                     src="/placeholder.svg?height=32&width=48&text=Logo"
                     alt="oneofwun"
@@ -311,24 +311,24 @@ export default function RegisterPage() {
                     className="object-contain"
                   />
                 </div>
-                <span className="text-2xl font-bold text-gray-900">oneofwun</span>
+                <span className="text-xl sm:text-2xl font-bold text-gray-900">oneofwun</span>
               </Link>
 
-              <CardTitle className="text-2xl font-bold text-gray-900">Create Account</CardTitle>
-              <CardDescription className="text-gray-600">
+              <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900">Create Account</CardTitle>
+              <CardDescription className="text-sm sm:text-base text-gray-600">
                 {step === "details" && "Enter your details to get started"}
                 {step === "phone" && "We'll send you a verification code"}
                 {step === "otp" && "Enter the code sent to your phone"}
               </CardDescription>
 
-              <div className="flex items-center justify-center space-x-2 mt-6">
-                <div className={`w-6 h-2 rounded-full ${step === "details" ? "bg-black" : "bg-gray-200"}`}></div>
-                <div className={`w-6 h-2 rounded-full ${step === "phone" ? "bg-black" : "bg-gray-200"}`}></div>
-                <div className={`w-6 h-2 rounded-full ${step === "otp" ? "bg-black" : "bg-gray-200"}`}></div>
+              <div className="flex items-center justify-center space-x-2 mt-4 sm:mt-6">
+                <div className={`w-5 sm:w-6 h-2 rounded-full ${step === "details" ? "bg-black" : "bg-gray-200"}`}></div>
+                <div className={`w-5 sm:w-6 h-2 rounded-full ${step === "phone" ? "bg-black" : "bg-gray-200"}`}></div>
+                <div className={`w-5 sm:w-6 h-2 rounded-full ${step === "otp" ? "bg-black" : "bg-gray-200"}`}></div>
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6 pb-4 sm:pb-6">
               {error && (
                 <div
                   className={`border px-4 py-3 rounded-lg text-sm flex items-center ${
@@ -366,8 +366,8 @@ export default function RegisterPage() {
               )}
 
               {step === "details" && (
-                <form onSubmit={handleDetailsSubmit} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleDetailsSubmit} className="space-y-4 sm:space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">
                         First Name
@@ -380,7 +380,7 @@ export default function RegisterPage() {
                           required
                           value={formData.firstName}
                           onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-base"
                           placeholder="John"
                         />
                       </div>
@@ -395,7 +395,7 @@ export default function RegisterPage() {
                         required
                         value={formData.lastName}
                         onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                        className="h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                        className="h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-base"
                         placeholder="Doe"
                       />
                     </div>
@@ -413,7 +413,7 @@ export default function RegisterPage() {
                         required
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-base"
                         placeholder="john@example.com"
                       />
                     </div>
@@ -423,12 +423,12 @@ export default function RegisterPage() {
                     <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
                       Phone Number
                     </Label>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                       <Select
                         value={formData.countryCode}
                         onValueChange={(value) => setFormData({ ...formData, countryCode: value })}
                       >
-                        <SelectTrigger className="w-32 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg">
+                        <SelectTrigger className="w-full sm:w-32 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -450,7 +450,7 @@ export default function RegisterPage() {
                           required
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "") })}
-                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg"
+                          className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-base"
                           placeholder="9876543210"
                         />
                       </div>
@@ -479,7 +479,7 @@ export default function RegisterPage() {
 
                   <Button
                     type="submit"
-                    className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                    className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors text-base"
                   >
                     Continue
                   </Button>
@@ -487,8 +487,8 @@ export default function RegisterPage() {
               )}
 
               {step === "phone" && (
-                <form onSubmit={handleSendOtp} className="space-y-6">
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <form onSubmit={handleSendOtp} className="space-y-4 sm:space-y-6">
+                  <div className="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-2">
                     <p className="text-sm text-gray-600">Creating account for:</p>
                     <p className="font-medium text-gray-900">
                       {formData.firstName} {formData.lastName}
@@ -502,7 +502,7 @@ export default function RegisterPage() {
 
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">Security Protection</Label>
-                    <div className="flex items-center justify-center p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex items-center justify-center p-3 sm:p-4 border border-gray-200 rounded-lg bg-gray-50">
                       {recaptchaReady ? (
                         <div className="flex items-center space-x-2 text-green-600 text-sm">
                           <Shield className="h-4 w-4" />
@@ -515,7 +515,7 @@ export default function RegisterPage() {
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 text-center">
+                    <p className="text-xs text-gray-500 text-center leading-relaxed">
                       This site is protected by reCAPTCHA and the Google{" "}
                       <a href="https://policies.google.com/privacy" className="text-blue-600 hover:underline">
                         Privacy Policy
@@ -526,14 +526,13 @@ export default function RegisterPage() {
                       </a>{" "}
                       apply.
                     </p>
-                    {/* Hidden container for Firebase reCAPTCHA */}
                     <div id="recaptcha-container" className="hidden"></div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <Button
                       type="submit"
-                      className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                      className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors text-base"
                       disabled={loading || !recaptchaReady}
                     >
                       {loading ? (
@@ -550,7 +549,7 @@ export default function RegisterPage() {
                       type="button"
                       onClick={handleBackToDetails}
                       variant="outline"
-                      className="w-full h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
+                      className="w-full h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent text-base"
                     >
                       Back to Details
                     </Button>
@@ -559,8 +558,8 @@ export default function RegisterPage() {
               )}
 
               {step === "otp" && (
-                <form onSubmit={handleVerifyOtp} className="space-y-6">
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <form onSubmit={handleVerifyOtp} className="space-y-4 sm:space-y-6">
+                  <div className="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-2">
                     <p className="text-sm text-gray-600">Verification code sent to:</p>
                     <p className="font-medium text-gray-900">
                       {formData.countryCode}
@@ -581,7 +580,7 @@ export default function RegisterPage() {
                         required
                         value={formData.otp}
                         onChange={(e) => setFormData({ ...formData, otp: e.target.value.replace(/\D/g, "") })}
-                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-center text-lg tracking-widest"
+                        className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-center text-lg sm:text-xl tracking-widest"
                         placeholder="000000"
                         maxLength={6}
                       />
@@ -589,10 +588,10 @@ export default function RegisterPage() {
                     <p className="text-xs text-gray-500">Enter the 6-digit code from your SMS</p>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <Button
                       type="submit"
-                      className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+                      className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors text-base"
                       disabled={loading || formData.otp.length !== 6}
                     >
                       {loading ? (
@@ -605,12 +604,12 @@ export default function RegisterPage() {
                       )}
                     </Button>
 
-                    <div className="flex space-x-4">
+                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
                       <Button
                         type="button"
                         onClick={handleBackToPhone}
                         variant="outline"
-                        className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
+                        className="w-full sm:flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent text-base"
                       >
                         Back
                       </Button>
@@ -618,7 +617,7 @@ export default function RegisterPage() {
                         type="button"
                         onClick={handleResendOtp}
                         variant="outline"
-                        className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent"
+                        className="w-full sm:flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-lg bg-transparent text-base"
                         disabled={loading}
                       >
                         Resend Code
@@ -628,7 +627,7 @@ export default function RegisterPage() {
                 </form>
               )}
 
-              <div className="text-center pt-6 border-t border-gray-100">
+              <div className="text-center pt-4 sm:pt-6 border-t border-gray-100">
                 <p className="text-sm text-gray-600">
                   Already have an account?{" "}
                   <Link href="/login" className="text-black hover:text-gray-700 font-medium">
