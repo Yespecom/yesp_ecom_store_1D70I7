@@ -134,28 +134,26 @@ export const verifyFirebaseOTP = async (
 
     console.log("✅ Firebase OTP verified, sending to server...")
 
-    // For login, don't generate temporary email - let server handle existing account
     const payload: any = {
       phone: phone,
-      otp: "FIREBASE_VERIFIED", // Special marker to indicate Firebase verification
+      otp: "FIREBASE_VERIFIED",
       purpose: purpose,
-      firebaseIdToken: idToken, // Include Firebase ID token for server verification
-      firebaseVerified: true, // Flag to indicate this came from Firebase
+      firebaseIdToken: idToken,
+      firebaseVerified: true,
     }
 
-    // Only add name and email for registration
     if (purpose === "registration") {
       payload.name = name || "User"
       payload.email = email || `${phone.replace("+", "")}@temp.oneofwun.com`
-    } else {
-      // For login, let the server find the existing account by phone
-      payload.name = name || "User" // Provide fallback name
+      payload.firstName = name?.split(" ")[0] || "User"
+      payload.lastName = name?.split(" ").slice(1).join(" ") || ""
+      payload.createAccount = true
     }
 
     console.log("📤 Sending payload to server:", payload)
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
 
     try {
       const response = await fetch("https://api.yespstudio.com/api/1D70I7/firebase-otp/verify-otp", {
@@ -175,24 +173,44 @@ export const verifyFirebaseOTP = async (
       if (response.ok) {
         console.log("✅ Server verification successful:", data)
 
-        // Extract customer data properly
-        let customer = data.customer || data.user
+        const customer = data.customer || data.user || data.data?.customer || data.data?.user
 
-        // If customer has temporary email, try to get real data from server response
-        if (customer && customer.email && customer.email.includes("@temp.oneofwun.com")) {
-          console.log("🔄 Customer has temporary email, checking for real data...")
+        if (purpose === "login" && !customer && data.error?.includes("not found")) {
+          return {
+            success: false,
+            error: "ACCOUNT_NOT_FOUND", // Special error code for UI handling
+          }
+        }
 
-          // If this is a login and we have better customer data in the response
-          if (purpose === "login" && data.existingCustomer) {
-            customer = data.existingCustomer
-            console.log("✅ Using existing customer data:", customer)
+        if (customer) {
+          // Normalize customer data structure
+          const normalizedCustomer = {
+            _id: customer._id || customer.id,
+            name: customer.name || `${customer.firstName || ""} ${customer.lastName || ""}`.trim(),
+            email: customer.email,
+            phone: customer.phone || phone,
+            firstName: customer.firstName || customer.name?.split(" ")[0] || "User",
+            lastName: customer.lastName || customer.name?.split(" ").slice(1).join(" ") || "",
+            ...customer,
+          }
+
+          return {
+            success: true,
+            token: data.token,
+            customer: normalizedCustomer,
           }
         }
 
         return {
           success: true,
-          token: data.token,
-          customer: customer,
+          token: data.token || "",
+          customer: {
+            name: name || "User",
+            email: email || `${phone.replace("+", "")}@temp.oneofwun.com`,
+            phone: phone,
+            firstName: name?.split(" ")[0] || "User",
+            lastName: name?.split(" ").slice(1).join(" ") || "",
+          },
         }
       } else {
         throw new Error(data.error || data.message || "Server verification failed")
@@ -228,5 +246,33 @@ export const verifyFirebaseOTP = async (
       success: false,
       error: errorMessage,
     }
+  }
+}
+
+export const checkUserExists = async (phone: string): Promise<{ exists: boolean; user?: any }> => {
+  try {
+    console.log("🔍 Checking if user exists:", phone)
+
+    const response = await fetch("https://api.yespstudio.com/api/1D70I7/auth/check-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ phone }),
+    })
+
+    const data = await response.json()
+
+    if (response.ok) {
+      return {
+        exists: data.exists || false,
+        user: data.user || null,
+      }
+    }
+
+    return { exists: false }
+  } catch (error) {
+    console.error("❌ Error checking user existence:", error)
+    return { exists: false }
   }
 }
