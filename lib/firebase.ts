@@ -1,7 +1,7 @@
 "use client"
 
 import { initializeApp, getApps, getApp } from "firebase/app"
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"
+import { getAuth, signInWithPhoneNumber } from "firebase/auth"
 import type { Auth } from "firebase/auth"
 
 const firebaseConfig = {
@@ -13,34 +13,126 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
-const auth: Auth = getAuth(app)
+const validateFirebaseConfig = () => {
+  const requiredKeys = ["apiKey", "authDomain", "projectId", "appId"]
+  const missing = requiredKeys.filter((key) => !firebaseConfig[key as keyof typeof firebaseConfig])
 
-// Set language code for SMS
-auth.languageCode = "en"
+  if (missing.length > 0) {
+    console.error("❌ Missing Firebase configuration:", missing)
+    return false
+  }
+  return true
+}
 
-// Create reCAPTCHA verifier
-export const createRecaptchaVerifier = (containerId: string) => {
-  if (typeof window === "undefined") return null
+// Initialize Firebase only if config is valid
+let app: any = null
+let auth: Auth | null = null
 
-  const container = document.getElementById(containerId)
-  if (!container) {
-    throw new Error(`reCAPTCHA container '${containerId}' not found`)
+if (validateFirebaseConfig()) {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
+  auth = getAuth(app)
+  // Set language code for SMS
+  auth.languageCode = "en"
+} else {
+  console.error("❌ Firebase not initialized due to missing configuration")
+}
+
+let recaptchaV3Instance: any = null
+let recaptchaV3Ready = false
+
+export const initializeRecaptchaV3 = (): Promise<boolean> => {
+  if (typeof window === "undefined") {
+    console.error("❌ Cannot initialize reCAPTCHA v3: not in browser environment")
+    return Promise.resolve(false)
   }
 
-  // Clear any existing reCAPTCHA
-  container.innerHTML = ""
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+  if (!siteKey) {
+    console.error("❌ reCAPTCHA v3 site key not configured")
+    console.error("💡 Add NEXT_PUBLIC_RECAPTCHA_SITE_KEY to your environment variables")
+    return Promise.resolve(false)
+  }
 
-  return new RecaptchaVerifier(auth, containerId, {
-    size: "normal",
-    callback: (response: any) => {
-      console.log("✅ reCAPTCHA solved:", response)
-    },
-    "expired-callback": () => {
-      console.log("❌ reCAPTCHA expired")
-    },
+  const currentDomain = window.location.hostname
+  console.log(`🌐 Current domain: ${currentDomain}`)
+  console.log(`🔑 Using reCAPTCHA site key: ${siteKey.substring(0, 10)}...`)
+
+  // Return existing instance if already ready
+  if (recaptchaV3Ready && window.grecaptcha) {
+    return Promise.resolve(true)
+  }
+
+  return new Promise((resolve) => {
+    try {
+      // Check if script already exists
+      const existingScript = document.querySelector(`script[src*="recaptcha/api.js"]`)
+      if (existingScript) {
+        existingScript.remove()
+      }
+
+      const script = document.createElement("script")
+      script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`
+      script.async = true
+      script.defer = true
+
+      script.onload = () => {
+        if (window.grecaptcha) {
+          window.grecaptcha.ready(() => {
+            recaptchaV3Instance = window.grecaptcha
+            recaptchaV3Ready = true
+            console.log("✅ reCAPTCHA v3 initialized successfully")
+            resolve(true)
+          })
+        } else {
+          console.error("❌ reCAPTCHA v3 failed to load")
+          resolve(false)
+        }
+      }
+
+      script.onerror = () => {
+        console.error("❌ Failed to load reCAPTCHA v3 script")
+        console.error(`💡 Check if site key is valid and domain '${currentDomain}' is authorized`)
+        console.error("💡 Go to https://www.google.com/recaptcha/admin and add your domain")
+        resolve(false)
+      }
+
+      document.head.appendChild(script)
+    } catch (error) {
+      console.error("❌ Error initializing reCAPTCHA v3:", error)
+      resolve(false)
+    }
   })
+}
+
+export const getRecaptchaV3Token = async (action = "phone_auth"): Promise<string | null> => {
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+
+  if (!siteKey) {
+    console.error("❌ reCAPTCHA v3 site key not configured")
+    return null
+  }
+
+  if (!recaptchaV3Ready || !window.grecaptcha) {
+    console.log("🔄 Initializing reCAPTCHA v3...")
+    const initialized = await initializeRecaptchaV3()
+    if (!initialized) {
+      return null
+    }
+  }
+
+  try {
+    const token = await window.grecaptcha.execute(siteKey, { action })
+    console.log("✅ reCAPTCHA v3 token generated for action:", action)
+    return token
+  } catch (error) {
+    console.error("❌ Error getting reCAPTCHA v3 token:", error)
+    if (error instanceof Error && error.message.includes("401")) {
+      console.error("💡 401 Unauthorized: Site key is invalid or domain not authorized")
+      console.error(`💡 Current domain: ${window.location.hostname}`)
+      console.error("💡 Add this domain to your reCAPTCHA site key at https://www.google.com/recaptcha/admin")
+    }
+    return null
+  }
 }
 
 export { auth, signInWithPhoneNumber }
