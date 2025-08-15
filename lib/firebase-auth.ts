@@ -5,6 +5,7 @@ import {
   createRecaptchaVerifier,
   clearRecaptchaVerifier,
   signInWithPhoneNumber,
+  initializeRecaptchaV3,
   getRecaptchaV3Token,
 } from "./firebase"
 import type { ConfirmationResult } from "firebase/auth"
@@ -43,18 +44,24 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
     let recaptchaVerifier = null
 
     try {
-      const v3Token = await getRecaptchaV3Token("phone_auth")
-      if (v3Token) {
-        console.log("✅ Using reCAPTCHA v3 token")
-        // For v3, we still need a verifier but can use invisible mode
-        recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
+      console.log("🔄 Attempting reCAPTCHA v3 initialization...")
+      const v3Ready = await initializeRecaptchaV3()
+
+      if (v3Ready) {
+        const v3Token = await getRecaptchaV3Token("phone_auth")
+        if (v3Token) {
+          console.log("✅ reCAPTCHA v3 token obtained, using invisible v2 verifier")
+          // Even with v3 token, Firebase still needs a verifier for phone auth
+          recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
+        }
       }
     } catch (v3Error) {
-      console.warn("⚠️ reCAPTCHA v3 failed, falling back to v2:", v3Error)
+      console.warn("⚠️ reCAPTCHA v3 failed, using v2 invisible:", v3Error)
     }
 
-    // Fallback to v2 if v3 didn't work
+    // Fallback to v2 invisible if v3 didn't work
     if (!recaptchaVerifier) {
+      console.log("🔄 Using reCAPTCHA v2 invisible mode")
       recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
     }
 
@@ -78,7 +85,7 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
     let errorMessage = "Failed to send OTP"
 
     if (error.code === "auth/captcha-check-failed") {
-      errorMessage = "Security verification failed. Please complete the reCAPTCHA and try again."
+      errorMessage = "Security verification failed. Please refresh the page and try again."
     } else if (error.code === "auth/invalid-phone-number") {
       errorMessage = "Invalid phone number format. Please use international format (e.g., +919876543210)"
     } else if (error.code === "auth/too-many-requests") {
@@ -86,11 +93,11 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
     } else if (error.code === "auth/quota-exceeded") {
       errorMessage = "SMS quota exceeded. Please try again later."
     } else if (error.code === "auth/unauthorized-domain") {
-      errorMessage = "This domain is not authorized for Firebase authentication. Please contact support."
+      errorMessage = "This domain is not authorized. Please contact support."
     } else if (error.code === "auth/app-not-authorized") {
-      errorMessage = "App not authorized for Firebase authentication. Please contact support."
-    } else if (error.message?.includes("reCAPTCHA")) {
-      errorMessage = "reCAPTCHA verification failed. Please refresh the page and try again."
+      errorMessage = "App not authorized. Please contact support."
+    } else if (error.message?.includes("reCAPTCHA") || error.message?.includes("401")) {
+      errorMessage = "Security verification failed. Please check your reCAPTCHA configuration and try again."
     } else if (error.message) {
       errorMessage = error.message
     }
