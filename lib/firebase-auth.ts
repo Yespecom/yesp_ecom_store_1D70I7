@@ -1,13 +1,6 @@
 "use client"
 
-import {
-  auth,
-  createRecaptchaVerifier,
-  clearRecaptchaVerifier,
-  signInWithPhoneNumber,
-  initializeRecaptchaV3,
-  getRecaptchaV3Token,
-} from "./firebase"
+import { auth, createRecaptchaVerifier, clearRecaptchaVerifier, signInWithPhoneNumber } from "./firebase"
 import type { ConfirmationResult } from "firebase/auth"
 
 export type { ConfirmationResult }
@@ -36,6 +29,10 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
       }
     }
 
+    // Check if we're in the right domain context
+    const currentDomain = typeof window !== "undefined" ? window.location.hostname : ""
+    console.log("🌐 Current domain:", currentDomain)
+
     clearRecaptchaVerifier()
 
     // Wait a bit for DOM to be ready
@@ -44,31 +41,30 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
     let recaptchaVerifier = null
 
     try {
-      console.log("🔄 Attempting reCAPTCHA v3 initialization...")
-      const v3Ready = await initializeRecaptchaV3()
+      console.log("🔄 Initializing invisible reCAPTCHA for Firebase...")
 
-      if (v3Ready) {
-        const v3Token = await getRecaptchaV3Token("phone_auth")
-        if (v3Token) {
-          console.log("✅ reCAPTCHA v3 token obtained, using invisible v2 verifier")
-          // Even with v3 token, Firebase still needs a verifier for phone auth
-          recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
+      // Use invisible reCAPTCHA v2 which works better with Firebase phone auth
+      recaptchaVerifier = createRecaptchaVerifier("recaptcha-container", true) // true for invisible mode
+
+      if (recaptchaVerifier) {
+        console.log("✅ Invisible reCAPTCHA initialized successfully")
+      }
+    } catch (recaptchaError: any) {
+      console.warn("⚠️ reCAPTCHA initialization failed:", recaptchaError)
+
+      if (recaptchaError.message?.includes("401") || recaptchaError.message?.includes("Unauthorized")) {
+        return {
+          success: false,
+          error: `reCAPTCHA domain mismatch. Please configure your reCAPTCHA site key for domain: ${currentDomain}. Visit Google reCAPTCHA console to add this domain.`,
         }
       }
-    } catch (v3Error) {
-      console.warn("⚠️ reCAPTCHA v3 failed, using v2 invisible:", v3Error)
-    }
-
-    // Fallback to v2 invisible if v3 didn't work
-    if (!recaptchaVerifier) {
-      console.log("🔄 Using reCAPTCHA v2 invisible mode")
-      recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
     }
 
     if (!recaptchaVerifier) {
       return {
         success: false,
-        error: "Failed to initialize security verification. Please refresh the page and try again.",
+        error:
+          "Failed to initialize security verification. Please check your reCAPTCHA configuration and refresh the page.",
       }
     }
 
@@ -85,7 +81,8 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
     let errorMessage = "Failed to send OTP"
 
     if (error.code === "auth/captcha-check-failed") {
-      errorMessage = "Security verification failed. Please refresh the page and try again."
+      const currentDomain = typeof window !== "undefined" ? window.location.hostname : ""
+      errorMessage = `Security verification failed. Your reCAPTCHA site key may not be configured for domain: ${currentDomain}. Please check your reCAPTCHA console settings.`
     } else if (error.code === "auth/invalid-phone-number") {
       errorMessage = "Invalid phone number format. Please use international format (e.g., +919876543210)"
     } else if (error.code === "auth/too-many-requests") {
@@ -93,11 +90,13 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
     } else if (error.code === "auth/quota-exceeded") {
       errorMessage = "SMS quota exceeded. Please try again later."
     } else if (error.code === "auth/unauthorized-domain") {
-      errorMessage = "This domain is not authorized. Please contact support."
+      const currentDomain = typeof window !== "undefined" ? window.location.hostname : ""
+      errorMessage = `Domain ${currentDomain} is not authorized. Please add this domain to your Firebase project's authorized domains.`
     } else if (error.code === "auth/app-not-authorized") {
-      errorMessage = "App not authorized. Please contact support."
+      errorMessage = "App not authorized. Please check your Firebase project configuration."
     } else if (error.message?.includes("reCAPTCHA") || error.message?.includes("401")) {
-      errorMessage = "Security verification failed. Please check your reCAPTCHA configuration and try again."
+      const currentDomain = typeof window !== "undefined" ? window.location.hostname : ""
+      errorMessage = `reCAPTCHA configuration error for domain ${currentDomain}. Please verify your site key is configured correctly.`
     } else if (error.message) {
       errorMessage = error.message
     }
