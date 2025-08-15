@@ -89,39 +89,98 @@ export default function OrdersPage() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch(
-        `https://api.yespstudio.com/api/${STORE_ID}/orders?page=${currentPage}&limit=5`,
-        {
+
+      console.log("📦 Loading orders from API...")
+
+      try {
+        const response = await fetch(`https://api.yespstudio.com/api/${STORE_ID}/orders?page=${currentPage}&limit=5`, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        },
-      )
+        })
 
-      if (response.ok) {
-        const data: OrdersResponse = await response.json()
-        if (data.success) {
-          setOrders(data.orders)
-          setPagination(data.pagination)
+        if (response.ok) {
+          const data: OrdersResponse = await response.json()
+          console.log("📦 Orders API response:", data)
+
+          if (data.success) {
+            setOrders(data.orders)
+            setPagination(data.pagination)
+            console.log("✅ Orders loaded successfully:", data.orders.length, "orders")
+          } else {
+            console.error("❌ Orders API returned error:", data.message)
+            setError(data.message || "Failed to load orders.")
+            toast.error(data.message || "Failed to load orders.")
+          }
+        } else if (response.status === 401) {
+          console.log("🔐 Authentication failed, redirecting to login")
+          localStorage.removeItem("auth_token")
+          localStorage.removeItem("user_data")
+          router.push("/login")
+          toast.error("Session expired. Please login again.")
         } else {
-          setError(data.message || "Failed to load orders.")
-          toast.error(data.message || "Failed to load orders.")
+          const errorData = await response.json().catch(() => ({}))
+          console.error("❌ Orders API error:", response.status, errorData)
+          setError(errorData.error || `Failed to load orders (${response.status}).`)
+          toast.error(errorData.error || `Failed to load orders (${response.status}).`)
         }
-      } else if (response.status === 401) {
-        localStorage.removeItem("auth_token")
-        localStorage.removeItem("user_data")
-        router.push("/login")
-        toast.error("Session expired. Please login again.")
-      } else {
-        const errorData = await response.json().catch(() => ({}))
-        setError(errorData.error || "Failed to load orders.")
-        toast.error(errorData.error || "Failed to load orders.")
+      } catch (apiError) {
+        console.error("❌ Network error loading orders:", apiError)
+
+        console.log("🔄 Attempting to load orders from local storage...")
+        const localOrders = []
+
+        // Check for last order
+        const lastOrder = localStorage.getItem("lastOrder")
+        if (lastOrder) {
+          try {
+            const parsedOrder = JSON.parse(lastOrder)
+            localOrders.push({
+              _id: parsedOrder.databaseOrderId || parsedOrder.orderNumber,
+              orderNumber: parsedOrder.orderNumber,
+              status: parsedOrder.status || "pending",
+              items: parsedOrder.items.map((item: any) => ({
+                product: {
+                  _id: item.productId,
+                  name: item.name,
+                  thumbnail: item.thumbnail,
+                  slug: item.slug || item.productId,
+                },
+                quantity: item.quantity,
+                price: item.price,
+              })),
+              total: parsedOrder.total,
+              paymentMethod: parsedOrder.paymentMethod,
+              paymentStatus: parsedOrder.paymentStatus || "pending",
+              createdAt: parsedOrder.createdAt || new Date().toISOString(),
+            })
+            console.log("📦 Loaded order from local storage:", parsedOrder.orderNumber)
+          } catch (parseError) {
+            console.error("❌ Failed to parse local order:", parseError)
+          }
+        }
+
+        if (localOrders.length > 0) {
+          setOrders(localOrders)
+          setPagination({
+            currentPage: 1,
+            totalPages: 1,
+            totalOrders: localOrders.length,
+            hasNextPage: false,
+            hasPrevPage: false,
+            limit: 5,
+          })
+          toast.success("Showing orders from local storage")
+        } else {
+          setError("Network error and no local orders found.")
+          toast.error("Network error. Please check your connection and try again.")
+        }
       }
     } catch (err: any) {
-      console.error("Error loading orders:", err)
-      setError("Network error or failed to connect to server.")
-      toast.error("Network error or failed to connect to server.")
+      console.error("❌ Unexpected error loading orders:", err)
+      setError("Unexpected error occurred.")
+      toast.error("An unexpected error occurred.")
     } finally {
       setLoading(false)
     }
