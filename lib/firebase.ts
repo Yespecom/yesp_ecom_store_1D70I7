@@ -50,8 +50,13 @@ export const initializeRecaptchaV3 = (): Promise<boolean> => {
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
   if (!siteKey) {
     console.error("❌ reCAPTCHA v3 site key not configured")
+    console.error("💡 Add NEXT_PUBLIC_RECAPTCHA_SITE_KEY to your environment variables")
     return Promise.resolve(false)
   }
+
+  const currentDomain = window.location.hostname
+  console.log(`🌐 Current domain: ${currentDomain}`)
+  console.log(`🔑 Using reCAPTCHA site key: ${siteKey.substring(0, 10)}...`)
 
   // Return existing instance if already ready
   if (recaptchaV3Ready && window.grecaptcha) {
@@ -87,6 +92,8 @@ export const initializeRecaptchaV3 = (): Promise<boolean> => {
 
       script.onerror = () => {
         console.error("❌ Failed to load reCAPTCHA v3 script")
+        console.error(`💡 Check if site key is valid and domain '${currentDomain}' is authorized`)
+        console.error("💡 Go to https://www.google.com/recaptcha/admin and add your domain")
         resolve(false)
       }
 
@@ -120,6 +127,11 @@ export const getRecaptchaV3Token = async (action = "phone_auth"): Promise<string
     return token
   } catch (error) {
     console.error("❌ Error getting reCAPTCHA v3 token:", error)
+    if (error instanceof Error && error.message.includes("401")) {
+      console.error("💡 401 Unauthorized: Site key is invalid or domain not authorized")
+      console.error(`💡 Current domain: ${window.location.hostname}`)
+      console.error("💡 Add this domain to your reCAPTCHA site key at https://www.google.com/recaptcha/admin")
+    }
     return null
   }
 }
