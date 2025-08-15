@@ -111,16 +111,7 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const tempContainer = document.createElement("div")
-      tempContainer.id = "recaptcha-resend-container"
-      tempContainer.style.position = "fixed"
-      tempContainer.style.top = "-9999px"
-      tempContainer.style.left = "-9999px"
-      document.body.appendChild(tempContainer)
-
-      const result = await sendFirebaseOTP(formData.phone, "recaptcha-resend-container")
-
-      document.body.removeChild(tempContainer)
+      const result = await sendFirebaseOTP(formData.phone, "recaptcha-container")
 
       if (result.success && result.confirmationResult) {
         setConfirmationResult(result.confirmationResult)
@@ -132,11 +123,6 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Firebase OTP resend failed:", error)
       setError(error.message || "Failed to resend OTP")
-
-      const tempContainer = document.getElementById("recaptcha-resend-container")
-      if (tempContainer) {
-        document.body.removeChild(tempContainer)
-      }
     } finally {
       setLoading(false)
     }
@@ -279,14 +265,11 @@ export default function LoginPage() {
                     <p className="text-xs text-gray-500">Enter your phone number with country code</p>
                   </div>
 
-                  {/* Firebase reCAPTCHA Container */}
+                  {/* Firebase reCAPTCHA Container - invisible for v3 */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
-                    <div
-                      id="recaptcha-container"
-                      className="flex justify-center min-h-[78px] items-center border border-gray-200 rounded-lg bg-gray-50"
-                    ></div>
-                    <p className="text-xs text-gray-500">Complete the security check to continue</p>
+                    <div id="recaptcha-container" className="hidden"></div>
+                    <p className="text-xs text-gray-500">reCAPTCHA v3 - invisible security verification</p>
                   </div>
 
                   {/* Remember Me */}
