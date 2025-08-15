@@ -103,18 +103,32 @@ interface Order {
   notes?: string
 }
 
-interface RazorpayOrderResponse {
-  orderId: string
-  key: string
+interface PhonePeOrderResponse {
+  transactionId: string
+  paymentUrl: string
   amount: number
   currency: string
-  name: string
-  description: string
-  prefill: {
+  merchantId: string
+  appId: string
+}
+
+interface PhonePeConfig {
+  enabled: boolean
+  merchantId: string
+  appId: string
+  environment: "sandbox" | "production"
+}
+
+interface PaymentConfig {
+  codEnabled: boolean
+  onlinePaymentEnabled: boolean
+  phonepe: PhonePeConfig
+  supportedMethods: Array<{
+    id: string
     name: string
-    email: string
-    contact: string
-  }
+    description: string
+    enabled: boolean
+  }>
 }
 
 export class ApiClient {
@@ -373,7 +387,7 @@ export class ApiClient {
     }
     notes?: string
     couponCode?: string
-  }): Promise<ApiResponse<RazorpayOrderResponse>> {
+  }): Promise<ApiResponse<any>> {
     console.log("💳 Step 1: Initiating Razorpay payment...")
     console.log("💳 Order data:", JSON.stringify(orderData, null, 2))
     try {
@@ -382,7 +396,7 @@ export class ApiClient {
       const testResponse = await fetch(`${BASE_URL}/payments/test`)
       console.log("🧪 Payments test endpoint status:", testResponse.status)
 
-      const response = await this.request<RazorpayOrderResponse>("/payments/initiate", {
+      const response = await this.request<any>("/payments/initiate", {
         method: "POST",
         body: JSON.stringify(orderData),
       })
@@ -1062,8 +1076,189 @@ export class ApiClient {
     console.log("🎫 Fetching available coupons")
     return this.request("/coupons")
   }
+
+  // PhonePe Configuration API
+  async getPhonePeConfig() {
+    console.log("💳 Fetching PhonePe configuration...")
+    try {
+      const connectivityTest = await this.testApiConnectivity()
+      console.log("🧪 Connectivity test results:", connectivityTest)
+
+      const response = await fetch(`${BASE_URL}/payments/config`)
+      console.log("💳 Config response status:", response.status, response.statusText)
+      console.log("💳 Config response headers:", Object.fromEntries(response.headers.entries()))
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("❌ Config request failed:", errorText)
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      console.log("✅ PhonePe config retrieved:", data)
+      return {
+        success: true,
+        data: data,
+      }
+    } catch (error: any) {
+      console.error("❌ Failed to get PhonePe config:", error)
+      // Return default fallback config
+      return {
+        success: true,
+        data: {
+          config: {
+            codEnabled: true,
+            onlinePaymentEnabled: true,
+            phonepe: {
+              enabled: true,
+              merchantId: "PGTESTPAYUAT",
+              appId: "83ff1e32-3d2e-4a9a-8ccc-d4a0c8c0c0c0",
+              environment: "sandbox",
+            },
+            supportedMethods: [
+              {
+                id: "phonepe",
+                name: "Online Payment",
+                description: "Pay securely with UPI, Cards, Net Banking",
+                enabled: true,
+              },
+              {
+                id: "cod",
+                name: "Cash on Delivery",
+                description: "Pay when your order is delivered",
+                enabled: true,
+              },
+            ],
+          },
+        },
+      }
+    }
+  }
+
+  // PhonePe Order Creation API
+  async createPhonePeOrder(orderData: {
+    items: Array<{
+      productId: string
+      quantity: number
+    }>
+    shippingAddress: {
+      name: string
+      street: string
+      city: string
+      state: string
+      zipCode: string
+      country?: string
+    }
+    amount: number
+    customerInfo: {
+      name: string
+      email: string
+      phone: string
+    }
+    notes?: string
+    couponCode?: string
+  }): Promise<ApiResponse<PhonePeOrderResponse>> {
+    console.log("💳 Creating PhonePe order...")
+    console.log("💳 Order data:", JSON.stringify(orderData, null, 2))
+    try {
+      console.log("🧪 Testing phonepe/create-order endpoint availability...")
+      const testResponse = await fetch(`${BASE_URL}/payments/test`)
+      console.log("🧪 Payments test endpoint status:", testResponse.status)
+
+      const response = await this.request<PhonePeOrderResponse>("/payments/phonepe/create-order", {
+        method: "POST",
+        body: JSON.stringify(orderData),
+      })
+      console.log("✅ PhonePe order created:", response)
+      return response
+    } catch (error: any) {
+      console.error("❌ Failed to create PhonePe order:", error)
+      if (error.name === "APIError_404") {
+        console.error("🔍 404 Error - Route not found. Checking available routes...")
+        try {
+          const testResponse = await fetch(`${BASE_URL}/payments/test`)
+          console.log("🧪 Payments test endpoint status:", testResponse.status)
+          if (testResponse.ok) {
+            const testData = await testResponse.text()
+            console.log("🧪 Test endpoint response:", testData)
+          }
+        } catch (testError) {
+          console.error("🧪 Test endpoint also failed:", testError)
+        }
+      }
+      throw error
+    }
+  }
+
+  async createOrderAfterPayment(orderData: {
+    items: Array<{
+      productId: string
+      quantity: number
+    }>
+    shippingAddress: {
+      name: string
+      street: string
+      city: string
+      state: string
+      zipCode: string
+      country?: string
+    }
+    paymentMethod: "online" | "cod"
+    notes?: string
+    couponCode?: string
+    // PhonePe response data (only for online payments)
+    phonePeTransactionId?: string
+    phonePePaymentId?: string
+    phonePeStatus?: string
+  }) {
+    console.log("📦 Creating order after PhonePe payment verification...")
+    const paymentStatus = orderData.paymentMethod === "online" ? "paid" : "pending"
+
+    const apiOrderData = {
+      items: orderData.items,
+      shippingAddress: orderData.shippingAddress,
+      paymentMethod: orderData.paymentMethod,
+      paymentStatus: paymentStatus,
+      notes: orderData.notes || "",
+      ...(orderData.couponCode && { couponCode: orderData.couponCode }),
+      // Include PhonePe data for online payments
+      ...(orderData.phonePeTransactionId && { phonePeTransactionId: orderData.phonePeTransactionId }),
+      ...(orderData.phonePePaymentId && { phonePePaymentId: orderData.phonePePaymentId }),
+      ...(orderData.phonePeStatus && { phonePeStatus: orderData.phonePeStatus }),
+    }
+
+    console.log("📤 Creating order with payment status:", paymentStatus)
+
+    try {
+      const response = await this.request<any>("/orders", {
+        method: "POST",
+        body: JSON.stringify(apiOrderData),
+      })
+
+      console.log("✅ Order created successfully after PhonePe payment:", response)
+      return response
+    } catch (error: any) {
+      console.error("❌ Failed to create order after PhonePe payment:", error)
+      throw error
+    }
+  }
+
+  // PhonePe Payment Verification API
+  async verifyPhonePePayment(transactionId: string) {
+    console.log("🔍 Verifying PhonePe payment:", transactionId)
+    try {
+      const response = await this.request<any>(`/payments/phonepe/status/${transactionId}`, {
+        method: "GET",
+      })
+      console.log("✅ PhonePe payment verification result:", response)
+      return response
+    } catch (error: any) {
+      console.error("❌ Failed to verify PhonePe payment:", error)
+      throw error
+    }
+  }
 }
 
 export const apiClient = new ApiClient()
 export const api = apiClient // For backward compatibility
-export type { Product, Customer, Order, RazorpayOrderResponse, ProductVariant } // Export ProductVariant
+export type { Product, Customer, Order, PhonePeOrderResponse, PhonePeConfig, PaymentConfig } // Export PhonePe interfaces
