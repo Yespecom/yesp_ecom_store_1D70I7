@@ -31,22 +31,17 @@ import {
 } from "lucide-react"
 import { apiClient } from "@/lib/api"
 
-// Razorpay types
-declare global {
-  interface Window {
-    Razorpay: any
-  }
-}
-
-interface RazorpayConfig {
+interface PhonePeConfig {
   enabled: boolean
-  keyId: string
+  merchantId: string
+  appId: string
+  environment: "sandbox" | "production"
 }
 
 interface PaymentConfig {
   codEnabled: boolean
   onlinePaymentEnabled: boolean
-  razorpay: RazorpayConfig
+  phonepe: PhonePeConfig
   supportedMethods: Array<{
     id: string
     name: string
@@ -62,7 +57,6 @@ export default function CheckoutPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null)
-  const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [cartLoaded, setCartLoaded] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -78,12 +72,10 @@ export default function CheckoutPage() {
     country: "India",
   })
 
-  // Check if cart is loaded and has items
   useEffect(() => {
     if (cartState !== undefined) {
       setCartLoaded(true)
 
-      // Check if cart is empty after it's loaded
       if (cartState.items && cartState.items.length === 0) {
         console.log("🛒 Cart is empty, redirecting to products")
         toast.error("Your cart is empty")
@@ -94,10 +86,8 @@ export default function CheckoutPage() {
   }, [cartState, router])
 
   useEffect(() => {
-    // Only proceed if cart is loaded
     if (!cartLoaded) return
 
-    // Check authentication
     const checkAuthentication = () => {
       const token = localStorage.getItem("auth_token")
       const userData = localStorage.getItem("user_data")
@@ -114,7 +104,6 @@ export default function CheckoutPage() {
       setIsAuthenticated(true)
       setCheckingAuth(false)
 
-      // Load user data if available
       if (userData) {
         try {
           const user = JSON.parse(userData)
@@ -135,69 +124,44 @@ export default function CheckoutPage() {
     checkAuthentication()
   }, [cartLoaded, router])
 
-  // Load Razorpay configuration
   useEffect(() => {
-    const loadRazorpayConfig = async () => {
+    const loadPhonePeConfig = async () => {
       try {
-        console.log("🔧 Loading Razorpay configuration...")
-        const response = await apiClient.getRazorpayConfig()
-        console.log("💳 Razorpay config loaded:", response)
+        console.log("🔧 Loading PhonePe configuration...")
+        const response = await apiClient.getPhonePeConfig()
+        console.log("💳 PhonePe config loaded:", response)
 
         if (response.success && response.data?.config) {
           setPaymentConfig(response.data.config)
-
-          // Load Razorpay script if enabled
-          if (response.data.config.razorpay?.enabled && response.data.config.razorpay?.keyId) {
-            loadRazorpayScript()
-          }
         }
       } catch (error) {
-        console.error("Failed to load Razorpay config:", error)
+        console.error("Failed to load PhonePe config:", error)
         // Set default fallback config
         setPaymentConfig({
           codEnabled: true,
           onlinePaymentEnabled: true,
-          razorpay: {
+          phonepe: {
             enabled: true,
-            keyId: "rzp_test_1234567890", // Fallback for testing
+            merchantId: "PGTESTPAYUAT",
+            appId: "83ff1e32-3d2e-4a9a-8ccc-d4a0c8c0c0c0",
+            environment: "sandbox",
           },
           supportedMethods: [
             {
-              id: "razorpay",
+              id: "phonepe",
               name: "Online Payment",
-              description: "Pay securely with cards, UPI, wallets",
+              description: "Pay securely with UPI, Cards, Net Banking",
               enabled: true,
             },
           ],
         })
-        loadRazorpayScript()
       }
     }
 
     if (isAuthenticated) {
-      loadRazorpayConfig()
+      loadPhonePeConfig()
     }
   }, [isAuthenticated])
-
-  // Load Razorpay script
-  const loadRazorpayScript = () => {
-    if (window.Razorpay) {
-      setRazorpayLoaded(true)
-      return
-    }
-
-    const script = document.createElement("script")
-    script.src = "https://checkout.razorpay.com/v1/checkout.js"
-    script.onload = () => {
-      console.log("✅ Razorpay script loaded")
-      setRazorpayLoaded(true)
-    }
-    script.onerror = () => {
-      console.error("❌ Failed to load Razorpay script")
-      toast.error("Failed to load payment gateway")
-    }
-    document.body.appendChild(script)
-  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -205,7 +169,6 @@ export default function CheckoutPage() {
   }
 
   const calculateTotals = () => {
-    // Safely calculate totals with fallbacks
     const subtotal = cartState?.total || 0
     const shipping = 0 // Always free shipping
     const tax = subtotal * 0.18 // 18% GST
@@ -213,98 +176,69 @@ export default function CheckoutPage() {
     return { subtotal, shipping, tax, total }
   }
 
-  // Handle Razorpay payment with improved order creation
-  const handleRazorpayPayment = async (orderData: any, localOrderData: any) => {
-    if (!razorpayLoaded || !paymentConfig?.razorpay?.keyId) {
-      throw new Error("Razorpay not available")
+  const handlePhonePePayment = async (orderData: any, localOrderData: any) => {
+    if (!paymentConfig?.phonepe?.enabled) {
+      throw new Error("PhonePe not available")
     }
 
     const { total } = calculateTotals()
 
-    return new Promise((resolve, reject) => {
-      const options = {
-        key: paymentConfig.razorpay.keyId,
+    try {
+      console.log("💳 Initiating PhonePe payment...")
+
+      // Create PhonePe order
+      const phonePeOrderData = {
+        ...orderData,
         amount: Math.round(total * 100), // Amount in paise
-        currency: "INR",
-        name: "OneofWun",
-        description: `Order ${localOrderData.orderNumber}`,
-        prefill: {
+        customerInfo: {
           name: `${formData.firstName} ${formData.lastName}`,
           email: formData.email,
-          contact: formData.phone,
-        },
-        theme: {
-          color: "#000000",
-        },
-        handler: async (response: any) => {
-          console.log("✅ Razorpay payment successful:", response)
-          // Update order data with payment info - EXPLICITLY set payment status to completed
-          const updatedOrderData = {
-            ...orderData,
-            paymentMethod: "razorpay", // This will be normalized to "online" in the API client
-            paymentStatus: "completed", // EXPLICITLY set to completed for successful payments
-            paymentId: response.razorpay_payment_id,
-            paymentSignature: response.razorpay_signature,
-          }
-
-          const updatedLocalOrderData = {
-            ...localOrderData,
-            paymentMethod: "online", // Store as "online" locally to match backend
-            paymentId: response.razorpay_payment_id,
-            paymentStatus: "completed", // Mark as completed since payment was successful
-            razorpayPaymentId: response.razorpay_payment_id, // Keep original for reference
-            razorpaySignature: response.razorpay_signature,
-          }
-
-          // Always save locally first
-          localStorage.setItem("lastOrder", JSON.stringify(updatedLocalOrderData))
-          console.log("💾 Order saved locally after payment with COMPLETED status")
-
-          try {
-            console.log("📦 Creating order in database after successful payment...")
-            const orderResponse = await apiClient.createOrderWithFallback(updatedOrderData, updatedLocalOrderData)
-            console.log("✅ Order creation response:", orderResponse)
-
-            // Update local storage with any new order number from API
-            if (
-              orderResponse.order?.orderNumber &&
-              orderResponse.order.orderNumber !== updatedLocalOrderData.orderNumber
-            ) {
-              updatedLocalOrderData.orderNumber = orderResponse.order.orderNumber
-              localStorage.setItem("lastOrder", JSON.stringify(updatedLocalOrderData))
-            }
-
-            resolve(orderResponse)
-          } catch (error) {
-            console.error("❌ Failed to create order after payment:", error)
-            // Payment was successful, so we'll use local fallback
-            console.log("💾 Using local fallback - payment was successful")
-            resolve({
-              success: true,
-              order: updatedLocalOrderData,
-              message: "Payment successful! Order will be processed.",
-              isLocalOrder: true,
-            })
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            console.log("❌ Razorpay payment cancelled")
-            reject(new Error("Payment cancelled by user"))
-          },
+          phone: formData.phone,
         },
       }
 
-      const rzp = new window.Razorpay(options)
-      rzp.open()
-    })
+      const response = await apiClient.createPhonePeOrder(phonePeOrderData)
+
+      if (response.success && response.data?.paymentUrl) {
+        console.log("✅ PhonePe order created, redirecting to payment page...")
+
+        // Store order data locally before redirecting
+        const updatedLocalOrderData = {
+          ...localOrderData,
+          paymentMethod: "online",
+          paymentStatus: "pending",
+          phonePeTransactionId: response.data.transactionId,
+        }
+
+        localStorage.setItem("lastOrder", JSON.stringify(updatedLocalOrderData))
+        localStorage.setItem(
+          "pendingPayment",
+          JSON.stringify({
+            transactionId: response.data.transactionId,
+            orderData: updatedLocalOrderData,
+          }),
+        )
+
+        // Redirect to PhonePe payment page
+        window.location.href = response.data.paymentUrl
+
+        return {
+          success: true,
+          order: updatedLocalOrderData,
+          message: "Redirecting to PhonePe payment page...",
+        }
+      } else {
+        throw new Error(response.message || "Failed to create PhonePe order")
+      }
+    } catch (error) {
+      console.error("❌ PhonePe payment failed:", error)
+      throw error
+    }
   }
 
-  // Handle Pay Now button click with improved error handling
   const handlePayNow = async () => {
     setLoading(true)
     try {
-      // Check authentication first
       const token = localStorage.getItem("auth_token")
       if (!token) {
         console.log("❌ No auth token, redirecting to login")
@@ -313,7 +247,6 @@ export default function CheckoutPage() {
         return
       }
 
-      // Validate required fields
       const requiredFields = ["firstName", "lastName", "email", "phone", "address", "city", "state", "pincode"]
       const missingFields = requiredFields.filter((field) => !formData[field as keyof typeof formData])
 
@@ -323,17 +256,14 @@ export default function CheckoutPage() {
         return
       }
 
-      // Check if Razorpay is loaded and enabled
-      if (!razorpayLoaded || !paymentConfig?.razorpay?.enabled) {
+      if (!paymentConfig?.phonepe?.enabled) {
         toast.error("Payment gateway is not available. Please try again.")
         setLoading(false)
         return
       }
 
-      // Generate order number immediately
       const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-      // Prepare order data exactly as the API expects
       const orderData = {
         items: (cartState.items || []).map((item) => ({
           productId: item.product._id,
@@ -347,13 +277,12 @@ export default function CheckoutPage() {
           zipCode: formData.pincode,
           country: formData.country,
         },
-        paymentMethod: "razorpay",
+        paymentMethod: "phonepe", // Changed from razorpay to phonepe
         notes: `Email: ${formData.email}, Phone: ${formData.phone}`,
       }
 
       const { subtotal, shipping, tax, total } = calculateTotals()
 
-      // Store order details locally first (as backup)
       const localOrderData = {
         orderNumber,
         items: (cartState.items || []).map((item) => ({
@@ -378,57 +307,25 @@ export default function CheckoutPage() {
           email: formData.email,
           country: formData.country,
         },
-        paymentMethod: "online", // Store as "online" to match backend expectations
+        paymentMethod: "online",
         status: "confirmed",
-        paymentStatus: "pending", // Will be updated to "completed" after successful payment
+        paymentStatus: "pending",
         createdAt: new Date().toISOString(),
         notes: `Email: ${formData.email}, Phone: ${formData.phone}`,
       }
 
-      // Always save locally first
       localStorage.setItem("lastOrder", JSON.stringify(localOrderData))
       console.log("Order saved locally:", localOrderData)
 
-      // Open Razorpay payment
-      console.log("💳 Opening Razorpay payment...")
-      const response = await handleRazorpayPayment(orderData, localOrderData)
-      console.log("Payment and order creation response:", response)
+      console.log("💳 Opening PhonePe payment...")
+      const response = await handlePhonePePayment(orderData, localOrderData)
+      console.log("Payment response:", response)
 
-      let finalOrderNumber = orderNumber
-      let successMessage = "Payment successful! Order placed."
-
-      if (response.success) {
-        const orderInfo = response.order || response.data
-        if (orderInfo?.orderNumber) {
-          finalOrderNumber = orderInfo.orderNumber
-        }
-
-        if (response.isLocalOrder) {
-          successMessage = "Payment successful! Order will be synced to database."
-          toast.success(successMessage, {
-            description: "Your payment was completed successfully. Order details have been saved.",
-            duration: 5000,
-          })
-          console.log("✅ Payment successful, order processed locally")
-        } else {
-          successMessage = response.message || "Payment successful! Order placed."
-          toast.success(successMessage, {
-            description: "Payment completed and order saved to database.",
-            duration: 3000,
-          })
-          console.log("✅ Payment successful, order created in database")
-        }
-      }
-
-      // Clear cart
-      clearCart()
-
-      // Redirect to success page
-      router.push(`/order-success?orderNumber=${finalOrderNumber}`)
+      // PhonePe will redirect to payment page, so we don't need to handle success here
+      // The success will be handled by the callback URL
     } catch (error) {
       console.error("Payment processing failed:", error)
 
-      // Handle specific authentication errors
       if (error.message?.includes("Access denied") || error.message?.includes("Please login")) {
         console.log("❌ Authentication error, redirecting to login")
         toast.error("Session expired. Please login again.")
@@ -449,7 +346,6 @@ export default function CheckoutPage() {
     }
   }
 
-  // Show loading while checking authentication or cart
   if (checkingAuth || !cartLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -464,12 +360,10 @@ export default function CheckoutPage() {
     )
   }
 
-  // Don't render if not authenticated (will redirect)
   if (!isAuthenticated) {
     return null
   }
 
-  // Don't render if cart is empty or not loaded (will redirect)
   if (!cartState || !cartState.items || cartState.items.length === 0) {
     return null
   }
@@ -480,7 +374,6 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {/* Back Button */}
         <Button
           variant="ghost"
           onClick={() => router.back()}
@@ -490,7 +383,6 @@ export default function CheckoutPage() {
           Back to Shopping
         </Button>
 
-        {/* Progress Indicator - Hidden on mobile */}
         <div className="mb-6 sm:mb-8 hidden sm:block">
           <div className="flex items-center justify-center space-x-4">
             <div className="flex items-center">
@@ -517,7 +409,6 @@ export default function CheckoutPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
-          {/* Checkout Form */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Shipping Information */}
             <Card className="border shadow-sm bg-white">
@@ -685,23 +576,26 @@ export default function CheckoutPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {paymentConfig?.razorpay?.enabled ? (
+                {paymentConfig?.phonepe?.enabled ? (
                   <div className="space-y-4">
                     <div className="relative overflow-hidden rounded-xl border-2 border-gray-200 bg-gray-50 p-4 sm:p-6">
                       <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-black rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-600 rounded-full flex items-center justify-center">
                           <Smartphone className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                         </div>
                         <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900 text-base sm:text-lg">Secure Online Payment</h3>
+                          <h3 className="font-semibold text-gray-900 text-base sm:text-lg">PhonePe Secure Payment</h3>
                           <p className="text-gray-600 text-sm">Pay with UPI, Cards, Net Banking, and Digital Wallets</p>
                           <div className="flex flex-wrap items-center gap-2 mt-2">
                             <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-xs">
                               <Lock className="h-3 w-3 mr-1" />
                               SSL Secured
                             </Badge>
-                            <Badge variant="secondary" className="bg-gray-100 text-gray-800 border-gray-200 text-xs">
-                              Instant Processing
+                            <Badge
+                              variant="secondary"
+                              className="bg-purple-100 text-purple-800 border-purple-200 text-xs"
+                            >
+                              PhonePe Gateway
                             </Badge>
                           </div>
                         </div>
@@ -722,7 +616,7 @@ export default function CheckoutPage() {
                         <div>
                           <h4 className="font-medium text-gray-900 text-sm">100% Secure Payment</h4>
                           <p className="text-gray-600 text-xs mt-1">
-                            Your payment information is encrypted and secure. We never store your card details.
+                            Your payment information is encrypted and secure. Powered by PhonePe's trusted gateway.
                           </p>
                         </div>
                       </div>
@@ -808,7 +702,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Free Shipping Badge */}
                 <div className="flex items-center justify-center space-x-2 p-3 bg-green-50 rounded-lg border border-green-200">
                   <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
                   <div className="text-center">
@@ -817,10 +710,9 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Pay Now Button */}
                 <Button
                   onClick={handlePayNow}
-                  disabled={loading || !razorpayLoaded || !paymentConfig?.razorpay?.enabled}
+                  disabled={loading || !paymentConfig?.phonepe?.enabled}
                   className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold bg-black hover:bg-gray-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   {loading ? (
@@ -828,7 +720,7 @@ export default function CheckoutPage() {
                       <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       <span>Processing Payment...</span>
                     </div>
-                  ) : !razorpayLoaded || !paymentConfig?.razorpay?.enabled ? (
+                  ) : !paymentConfig?.phonepe?.enabled ? (
                     <div className="flex items-center space-x-2">
                       <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       <span>Loading Gateway...</span>
@@ -836,16 +728,15 @@ export default function CheckoutPage() {
                   ) : (
                     <div className="flex items-center space-x-2">
                       <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span>Pay Securely - ₹{total.toFixed(2)}</span>
+                      <span>Pay with PhonePe - ₹{total.toFixed(2)}</span>
                     </div>
                   )}
                 </Button>
 
-                {(!razorpayLoaded || !paymentConfig?.razorpay?.enabled) && (
+                {!paymentConfig?.phonepe?.enabled && (
                   <p className="text-center text-sm text-gray-500">Preparing secure payment gateway...</p>
                 )}
 
-                {/* Security Badges */}
                 <div className="flex items-center justify-center space-x-4 pt-4 border-t border-gray-200">
                   <div className="flex items-center space-x-1 text-xs text-gray-500">
                     <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
