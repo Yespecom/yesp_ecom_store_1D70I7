@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
-import { ArrowLeft, Phone, Shield, AlertCircle } from "lucide-react"
+import { ArrowLeft, Phone, Shield, AlertCircle, RefreshCw } from "lucide-react"
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -24,7 +24,26 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
+  const [recaptchaReady, setRecaptchaReady] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    if (step === "phone") {
+      const checkRecaptcha = () => {
+        const container = document.getElementById("recaptcha-container")
+        if (container && container.children.length > 0) {
+          setRecaptchaReady(true)
+        } else {
+          setRecaptchaReady(false)
+        }
+      }
+
+      checkRecaptcha()
+      const interval = setInterval(checkRecaptcha, 1000)
+
+      return () => clearInterval(interval)
+    }
+  }, [step])
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,19 +93,17 @@ export default function LoginPage() {
         formData.otp,
         formData.phone,
         "login",
-        undefined, // name not required for login
-        undefined, // email not required for login, will be handled by server
+        undefined,
+        undefined,
       )
 
       if (result.success && result.token && result.customer) {
         console.log("Login successful")
         console.log("Customer data:", result.customer)
 
-        // Store authentication data
         localStorage.setItem("auth_token", result.token)
         localStorage.setItem("user_data", JSON.stringify(result.customer))
 
-        // Trigger storage event for header update
         window.dispatchEvent(new Event("storage"))
         router.push("/")
       } else {
@@ -104,6 +121,7 @@ export default function LoginPage() {
     setStep("phone")
     setError("")
     setConfirmationResult(null)
+    setRecaptchaReady(false)
   }
 
   const handleResendOtp = async () => {
@@ -128,9 +146,19 @@ export default function LoginPage() {
     }
   }
 
+  const handleRefreshRecaptcha = () => {
+    const container = document.getElementById("recaptcha-container")
+    if (container) {
+      container.innerHTML = ""
+      setRecaptchaReady(false)
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">
-      {/* Left Side - Hero Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -167,10 +195,8 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right Side - Login Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          {/* Back to Home */}
           <Link
             href="/"
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-8 transition-colors"
@@ -181,7 +207,6 @@ export default function LoginPage() {
 
           <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
             <CardHeader className="text-center pb-8">
-              {/* Logo */}
               <Link href="/" className="flex items-center justify-center space-x-3 mb-6">
                 <div className="relative w-12 h-8">
                   <Image
@@ -199,7 +224,6 @@ export default function LoginPage() {
                 {step === "phone" ? "Enter your phone number to continue" : "Enter the OTP sent to your phone"}
               </CardDescription>
 
-              {/* Progress Indicator */}
               <div className="flex items-center justify-center space-x-2 mt-6">
                 <div className={`w-8 h-2 rounded-full ${step === "phone" ? "bg-black" : "bg-gray-200"}`}></div>
                 <div className={`w-8 h-2 rounded-full ${step === "otp" ? "bg-black" : "bg-gray-200"}`}></div>
@@ -224,20 +248,20 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* Firebase Configuration Warning */}
-              {error.includes("authorized domain") && (
+              {(error.includes("authorized domain") || error.includes("not properly configured")) && (
                 <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
                   <div className="flex items-start space-x-3">
                     <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
                     <div className="text-sm text-yellow-800">
-                      <p className="font-medium mb-2">Firebase Configuration Required</p>
-                      <p className="mb-2">To enable phone authentication, please:</p>
-                      <ol className="list-decimal list-inside space-y-1 text-xs">
-                        <li>Go to Firebase Console → Authentication → Settings</li>
-                        <li>Add your domain to "Authorized domains"</li>
-                        <li>Enable Phone authentication in Sign-in methods</li>
-                        <li>Configure your Firebase project settings</li>
-                      </ol>
+                      <p className="font-medium mb-2">Firebase Configuration Issue</p>
+                      <p className="mb-2">Authentication is not properly set up. This could be due to:</p>
+                      <ul className="list-disc list-inside space-y-1 text-xs">
+                        <li>Missing environment variables</li>
+                        <li>Domain not authorized in Firebase Console</li>
+                        <li>Phone authentication not enabled</li>
+                        <li>Firebase project configuration issues</li>
+                      </ul>
+                      <p className="mt-2 text-xs">Please contact support if this issue persists.</p>
                     </div>
                   </div>
                 </div>
@@ -245,7 +269,6 @@ export default function LoginPage() {
 
               {step === "phone" && (
                 <form onSubmit={handleSendOtp} className="space-y-6">
-                  {/* Phone Field */}
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
                       Phone Number
@@ -265,17 +288,39 @@ export default function LoginPage() {
                     <p className="text-xs text-gray-500">Enter your phone number with country code</p>
                   </div>
 
-                  {/* Firebase reCAPTCHA Container */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
+                      {!recaptchaReady && (
+                        <Button
+                          type="button"
+                          onClick={handleRefreshRecaptcha}
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Refresh
+                        </Button>
+                      )}
+                    </div>
                     <div
                       id="recaptcha-container"
                       className="flex justify-center min-h-[78px] items-center border border-gray-200 rounded-lg bg-gray-50"
-                    ></div>
-                    <p className="text-xs text-gray-500">Complete the security check to continue</p>
+                    >
+                      {!recaptchaReady && (
+                        <div className="text-center text-gray-500 text-sm">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2"></div>
+                          Loading security verification...
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-500">Complete the security check to continue</p>
+                      {recaptchaReady && <span className="text-xs text-green-600">✅ Ready</span>}
+                    </div>
                   </div>
 
-                  {/* Remember Me */}
                   <div className="flex items-center space-x-3">
                     <Checkbox
                       id="remember"
@@ -288,11 +333,10 @@ export default function LoginPage() {
                     </Label>
                   </div>
 
-                  {/* Send OTP Button */}
                   <Button
                     type="submit"
                     className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                    disabled={loading}
+                    disabled={loading || !recaptchaReady}
                   >
                     {loading ? (
                       <div className="flex items-center">
@@ -308,14 +352,12 @@ export default function LoginPage() {
 
               {step === "otp" && (
                 <form onSubmit={handleVerifyOtp} className="space-y-6">
-                  {/* Phone Display */}
                   <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                     <p className="text-sm text-gray-600">Signing in with:</p>
                     <p className="font-medium text-gray-900">{formData.phone}</p>
                     <p className="text-xs text-green-600 mt-1">✅ Real SMS sent via Firebase</p>
                   </div>
 
-                  {/* OTP Field */}
                   <div className="space-y-2">
                     <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
                       Enter OTP
@@ -327,7 +369,7 @@ export default function LoginPage() {
                         type="text"
                         required
                         value={formData.otp}
-                        onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, otp: e.target.value.replace(/\D/g, "") })}
                         className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-center text-lg tracking-widest"
                         placeholder="000000"
                         maxLength={6}
@@ -336,12 +378,11 @@ export default function LoginPage() {
                     <p className="text-xs text-gray-500">Enter the 6-digit code from your SMS</p>
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="space-y-4">
                     <Button
                       type="submit"
                       className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                      disabled={loading}
+                      disabled={loading || formData.otp.length !== 6}
                     >
                       {loading ? (
                         <div className="flex items-center">
@@ -376,7 +417,6 @@ export default function LoginPage() {
                 </form>
               )}
 
-              {/* Create Account Link */}
               <div className="text-center pt-6 border-t border-gray-100">
                 <p className="text-sm text-gray-600">
                   Don't have an account?{" "}
