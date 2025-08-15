@@ -1,6 +1,12 @@
 "use client"
 
-import { auth, createRecaptchaVerifier, clearRecaptchaVerifier, signInWithPhoneNumber } from "./firebase"
+import {
+  auth,
+  createRecaptchaVerifier,
+  clearRecaptchaVerifier,
+  signInWithPhoneNumber,
+  getRecaptchaV3Token,
+} from "./firebase"
 import type { ConfirmationResult } from "firebase/auth"
 
 export type { ConfirmationResult }
@@ -34,8 +40,23 @@ export const sendFirebaseOTP = async (phoneNumber: string): Promise<FirebaseOTPR
     // Wait a bit for DOM to be ready
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    // Create reCAPTCHA verifier
-    const recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
+    let recaptchaVerifier = null
+
+    try {
+      const v3Token = await getRecaptchaV3Token("phone_auth")
+      if (v3Token) {
+        console.log("✅ Using reCAPTCHA v3 token")
+        // For v3, we still need a verifier but can use invisible mode
+        recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
+      }
+    } catch (v3Error) {
+      console.warn("⚠️ reCAPTCHA v3 failed, falling back to v2:", v3Error)
+    }
+
+    // Fallback to v2 if v3 didn't work
+    if (!recaptchaVerifier) {
+      recaptchaVerifier = createRecaptchaVerifier("recaptcha-container")
+    }
 
     if (!recaptchaVerifier) {
       return {
