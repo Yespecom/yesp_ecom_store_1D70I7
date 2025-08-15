@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
+import { sendFirebaseOTP, verifyFirebaseOTP, checkUserExists, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
 import { initializeRecaptchaV3 } from "@/lib/firebase"
 import { ArrowLeft, Phone, Shield, AlertCircle } from "lucide-react"
@@ -57,7 +57,19 @@ export default function LoginPage() {
     }
 
     try {
-      console.log("Sending Firebase OTP for login...")
+      console.log("Checking if user exists...")
+      const userCheck = await checkUserExists(formData.phone)
+
+      if (!userCheck.exists) {
+        setError("Account not found. Redirecting to registration...")
+        setTimeout(() => {
+          router.push(`/register?phone=${encodeURIComponent(formData.phone)}`)
+        }, 2000)
+        setLoading(false)
+        return
+      }
+
+      console.log("✅ User exists, sending Firebase OTP for login...")
       const result = await sendFirebaseOTP(formData.phone)
 
       if (result.success && result.confirmationResult) {
@@ -97,15 +109,28 @@ export default function LoginPage() {
         undefined,
       )
 
+      if (!result.success && result.error === "ACCOUNT_NOT_FOUND") {
+        setError("Account not found. Redirecting to registration...")
+        setTimeout(() => {
+          router.push(`/register?phone=${encodeURIComponent(formData.phone)}`)
+        }, 2000)
+        setLoading(false)
+        return
+      }
+
       if (result.success && result.token && result.customer) {
-        console.log("Login successful")
+        console.log("✅ Login successful")
         console.log("Customer data:", result.customer)
 
         localStorage.setItem("auth_token", result.token)
         localStorage.setItem("user_data", JSON.stringify(result.customer))
 
         window.dispatchEvent(new Event("storage"))
-        router.push("/")
+
+        setError("Login successful! Redirecting...")
+        setTimeout(() => {
+          router.push("/")
+        }, 1000)
       } else {
         throw new Error(result.error || "Failed to verify OTP")
       }
