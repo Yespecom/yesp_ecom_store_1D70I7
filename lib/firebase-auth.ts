@@ -1,6 +1,6 @@
 "use client"
 
-import { auth, createRecaptchaVerifier, signInWithPhoneNumber } from "./firebase"
+import { auth, createRecaptchaVerifier, clearRecaptchaVerifier, signInWithPhoneNumber } from "./firebase"
 import type { ConfirmationResult } from "firebase/auth"
 
 export type { ConfirmationResult }
@@ -31,6 +31,10 @@ export const sendFirebaseOTP = async (
 
     const recaptchaVerifier = createRecaptchaVerifier(containerId)
 
+    if (!recaptchaVerifier) {
+      throw new Error("Failed to create reCAPTCHA verifier")
+    }
+
     // Send OTP via Firebase
     const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier)
 
@@ -41,10 +45,12 @@ export const sendFirebaseOTP = async (
   } catch (error: any) {
     console.error("❌ Error sending Firebase OTP:", error)
 
+    clearRecaptchaVerifier()
+
     let errorMessage = "Failed to send OTP"
 
     if (error.code === "auth/captcha-check-failed") {
-      errorMessage = "Security verification failed. Please ensure you're accessing from an authorized domain."
+      errorMessage = "Security verification failed. Please refresh the page and try again."
     } else if (error.code === "auth/invalid-phone-number") {
       errorMessage = "Invalid phone number format"
     } else if (error.code === "auth/too-many-requests") {
