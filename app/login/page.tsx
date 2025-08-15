@@ -12,7 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
-import { ArrowLeft, Phone, Shield, AlertCircle, RefreshCw } from "lucide-react"
+import { initializeRecaptchaV3 } from "@/lib/firebase"
+import { ArrowLeft, Phone, Shield, AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -28,20 +29,19 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (step === "phone") {
-      const checkRecaptcha = () => {
-        const container = document.getElementById("recaptcha-container")
-        if (container && container.children.length > 0) {
-          setRecaptchaReady(true)
-        } else {
-          setRecaptchaReady(false)
-        }
+    const initRecaptcha = async () => {
+      try {
+        await initializeRecaptchaV3()
+        setRecaptchaReady(true)
+        console.log("✅ reCAPTCHA v3 ready for login")
+      } catch (error) {
+        console.error("❌ Failed to initialize reCAPTCHA v3:", error)
+        setRecaptchaReady(false)
       }
+    }
 
-      checkRecaptcha()
-      const interval = setInterval(checkRecaptcha, 1000)
-
-      return () => clearInterval(interval)
+    if (step === "phone") {
+      initRecaptcha()
     }
   }, [step])
 
@@ -146,14 +146,15 @@ export default function LoginPage() {
     }
   }
 
-  const handleRefreshRecaptcha = () => {
-    const container = document.getElementById("recaptcha-container")
-    if (container) {
-      container.innerHTML = ""
-      setRecaptchaReady(false)
-      setTimeout(() => {
-        window.location.reload()
-      }, 500)
+  const handleRefreshRecaptcha = async () => {
+    setRecaptchaReady(false)
+    try {
+      await initializeRecaptchaV3()
+      setRecaptchaReady(true)
+      setError("")
+    } catch (error) {
+      console.error("❌ Failed to refresh reCAPTCHA:", error)
+      setError("Failed to refresh security verification")
     }
   }
 
@@ -289,36 +290,33 @@ export default function LoginPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
-                      {!recaptchaReady && (
-                        <Button
-                          type="button"
-                          onClick={handleRefreshRecaptcha}
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                        >
-                          <RefreshCw className="h-3 w-3 mr-1" />
-                          Refresh
-                        </Button>
-                      )}
-                    </div>
-                    <div
-                      id="recaptcha-container"
-                      className="flex justify-center min-h-[78px] items-center border border-gray-200 rounded-lg bg-gray-50"
-                    >
-                      {!recaptchaReady && (
-                        <div className="text-center text-gray-500 text-sm">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2"></div>
-                          Loading security verification...
+                    <Label className="text-sm font-medium text-gray-700">Security Protection</Label>
+                    <div className="flex items-center justify-center p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      {recaptchaReady ? (
+                        <div className="flex items-center space-x-2 text-green-600 text-sm">
+                          <Shield className="h-4 w-4" />
+                          <span>Protected by reCAPTCHA v3</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-2 text-gray-500 text-sm">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                          <span>Initializing protection...</span>
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-500">Complete the security check to continue</p>
-                      {recaptchaReady && <span className="text-xs text-green-600">✅ Ready</span>}
-                    </div>
+                    <p className="text-xs text-gray-500 text-center">
+                      This site is protected by reCAPTCHA and the Google{" "}
+                      <a href="https://policies.google.com/privacy" className="text-blue-600 hover:underline">
+                        Privacy Policy
+                      </a>{" "}
+                      and{" "}
+                      <a href="https://policies.google.com/terms" className="text-blue-600 hover:underline">
+                        Terms of Service
+                      </a>{" "}
+                      apply.
+                    </p>
+                    {/* Hidden container for Firebase reCAPTCHA */}
+                    <div id="recaptcha-container" className="hidden"></div>
                   </div>
 
                   <div className="flex items-center space-x-3">
