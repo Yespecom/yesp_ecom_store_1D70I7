@@ -39,8 +39,91 @@ if (validateFirebaseConfig()) {
 
 let currentRecaptchaVerifier: RecaptchaVerifier | null = null
 let recaptchaV3Instance: any = null
+let recaptchaV3Ready = false
 
-// reCAPTCHA v2 functions (for existing Firebase auth flow)
+export const initializeRecaptchaV3 = (): Promise<boolean> => {
+  if (typeof window === "undefined") {
+    console.error("❌ Cannot initialize reCAPTCHA v3: not in browser environment")
+    return Promise.resolve(false)
+  }
+
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+  if (!siteKey) {
+    console.error("❌ reCAPTCHA v3 site key not configured")
+    return Promise.resolve(false)
+  }
+
+  // Return existing instance if already ready
+  if (recaptchaV3Ready && window.grecaptcha) {
+    return Promise.resolve(true)
+  }
+
+  return new Promise((resolve) => {
+    try {
+      // Check if script already exists
+      const existingScript = document.querySelector(`script[src*="recaptcha/api.js"]`)
+      if (existingScript) {
+        existingScript.remove()
+      }
+
+      const script = document.createElement("script")
+      script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`
+      script.async = true
+      script.defer = true
+
+      script.onload = () => {
+        if (window.grecaptcha) {
+          window.grecaptcha.ready(() => {
+            recaptchaV3Instance = window.grecaptcha
+            recaptchaV3Ready = true
+            console.log("✅ reCAPTCHA v3 initialized successfully")
+            resolve(true)
+          })
+        } else {
+          console.error("❌ reCAPTCHA v3 failed to load")
+          resolve(false)
+        }
+      }
+
+      script.onerror = () => {
+        console.error("❌ Failed to load reCAPTCHA v3 script")
+        resolve(false)
+      }
+
+      document.head.appendChild(script)
+    } catch (error) {
+      console.error("❌ Error initializing reCAPTCHA v3:", error)
+      resolve(false)
+    }
+  })
+}
+
+export const getRecaptchaV3Token = async (action = "phone_auth"): Promise<string | null> => {
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+
+  if (!siteKey) {
+    console.error("❌ reCAPTCHA v3 site key not configured")
+    return null
+  }
+
+  if (!recaptchaV3Ready || !window.grecaptcha) {
+    console.log("🔄 Initializing reCAPTCHA v3...")
+    const initialized = await initializeRecaptchaV3()
+    if (!initialized) {
+      return null
+    }
+  }
+
+  try {
+    const token = await window.grecaptcha.execute(siteKey, { action })
+    console.log("✅ reCAPTCHA v3 token generated for action:", action)
+    return token
+  } catch (error) {
+    console.error("❌ Error getting reCAPTCHA v3 token:", error)
+    return null
+  }
+}
+
 export const createRecaptchaVerifier = (containerId: string) => {
   if (typeof window === "undefined" || !auth) {
     console.error("❌ Cannot create reCAPTCHA: window or auth not available")
@@ -67,17 +150,17 @@ export const createRecaptchaVerifier = (containerId: string) => {
       return null
     }
 
-    // Create new reCAPTCHA verifier
+    // Create new invisible reCAPTCHA verifier
     currentRecaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-      size: "invisible", // Use invisible reCAPTCHA for better UX
+      size: "invisible",
       callback: (response: any) => {
-        console.log("✅ reCAPTCHA solved:", response ? "Success" : "Failed")
+        console.log("✅ reCAPTCHA v2 solved")
       },
       "expired-callback": () => {
-        console.log("❌ reCAPTCHA expired - please refresh")
+        console.log("❌ reCAPTCHA v2 expired")
       },
       "error-callback": (error: any) => {
-        console.error("❌ reCAPTCHA error:", error)
+        console.error("❌ reCAPTCHA v2 error:", error)
       },
     })
 
@@ -97,59 +180,6 @@ export const clearRecaptchaVerifier = () => {
     } catch (error) {
       console.warn("⚠️ Error clearing reCAPTCHA verifier:", error)
     }
-  }
-}
-
-// reCAPTCHA v3 functions (for future enhancement)
-export const initializeRecaptchaV3 = () => {
-  if (typeof window === "undefined" || !auth) {
-    console.error("❌ Cannot initialize reCAPTCHA v3: window or auth not available")
-    return null
-  }
-
-  try {
-    // Import reCAPTCHA v3 dynamically
-    if (!window.grecaptcha) {
-      const script = document.createElement("script")
-      script.src = `https://www.google.com/recaptcha/api.js?render=${process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}`
-      script.async = true
-      script.defer = true
-      document.head.appendChild(script)
-
-      return new Promise((resolve) => {
-        script.onload = () => {
-          window.grecaptcha.ready(() => {
-            recaptchaV3Instance = window.grecaptcha
-            console.log("✅ reCAPTCHA v3 initialized")
-            resolve(recaptchaV3Instance)
-          })
-        }
-      })
-    } else {
-      recaptchaV3Instance = window.grecaptcha
-      return Promise.resolve(recaptchaV3Instance)
-    }
-  } catch (error) {
-    console.error("❌ Error initializing reCAPTCHA v3:", error)
-    return null
-  }
-}
-
-export const getRecaptchaV3Token = async (action = "phone_auth"): Promise<string | null> => {
-  if (!recaptchaV3Instance || !process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
-    console.error("❌ reCAPTCHA v3 not initialized or site key missing")
-    return null
-  }
-
-  try {
-    const token = await recaptchaV3Instance.execute(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY, {
-      action: action,
-    })
-    console.log("✅ reCAPTCHA v3 token generated for action:", action)
-    return token
-  } catch (error) {
-    console.error("❌ Error getting reCAPTCHA v3 token:", error)
-    return null
   }
 }
 
