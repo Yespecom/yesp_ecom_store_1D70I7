@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -10,9 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { sendFirebaseOTP, verifyFirebaseOTP, checkUserExists, type ConfirmationResult } from "@/lib/firebase-auth"
+import { sendFirebaseOTP, verifyFirebaseOTP, type ConfirmationResult } from "@/lib/firebase-auth"
 import { isValidE164Phone } from "@/lib/otp-auth"
-import { initializeRecaptchaV3 } from "@/lib/firebase"
 import { ArrowLeft, User, Mail, Phone, Shield, AlertCircle } from "lucide-react"
 
 export default function RegisterPage() {
@@ -28,38 +27,13 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
-  const [recaptchaReady, setRecaptchaReady] = useState(false)
   const router = useRouter()
-
-  useEffect(() => {
-    const initRecaptcha = async () => {
-      try {
-        await initializeRecaptchaV3()
-        setRecaptchaReady(true)
-        console.log("✅ reCAPTCHA v3 ready for registration")
-      } catch (error) {
-        console.error("❌ Failed to initialize reCAPTCHA v3:", error)
-        setRecaptchaReady(false)
-      }
-    }
-
-    if (step === "phone") {
-      initRecaptcha()
-    }
-  }, [step])
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const phoneParam = urlParams.get("phone")
-    if (phoneParam) {
-      setFormData((prev) => ({ ...prev, phone: phoneParam }))
-    }
-  }, [])
 
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
+    // Validate required fields
     if (!formData.firstName.trim()) {
       setError("First name is required")
       return
@@ -81,12 +55,14 @@ export default function RegisterPage() {
       return
     }
 
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(formData.email)) {
       setError("Please enter a valid email address")
       return
     }
 
+    // Validate phone format
     if (!isValidE164Phone(formData.phone)) {
       setError("Please enter a valid phone number with country code (e.g., +919876543210)")
       return
@@ -101,19 +77,7 @@ export default function RegisterPage() {
     setError("")
 
     try {
-      console.log("Checking if user already exists...")
-      const userCheck = await checkUserExists(formData.phone)
-
-      if (userCheck.exists) {
-        setError("Account already exists. Redirecting to login...")
-        setTimeout(() => {
-          router.push(`/login?phone=${encodeURIComponent(formData.phone)}`)
-        }, 2000)
-        setLoading(false)
-        return
-      }
-
-      console.log("✅ New user, sending Firebase OTP for registration...")
+      console.log("Sending Firebase OTP for registration...")
       const result = await sendFirebaseOTP(formData.phone)
 
       if (result.success && result.confirmationResult) {
@@ -154,18 +118,14 @@ export default function RegisterPage() {
       )
 
       if (result.success && result.token && result.customer) {
-        console.log("✅ Registration successful")
-        console.log("Customer data:", result.customer)
-
+        console.log("Registration successful")
+        // Store authentication data
         localStorage.setItem("auth_token", result.token)
         localStorage.setItem("user_data", JSON.stringify(result.customer))
 
+        // Trigger storage event for header update
         window.dispatchEvent(new Event("storage"))
-
-        setError("Registration successful! Welcome to oneofwun!")
-        setTimeout(() => {
-          router.push("/")
-        }, 1500)
+        router.push("/")
       } else {
         throw new Error(result.error || "Failed to verify OTP")
       }
@@ -186,7 +146,6 @@ export default function RegisterPage() {
     setStep("phone")
     setError("")
     setConfirmationResult(null)
-    setRecaptchaReady(false)
   }
 
   const handleResendOtp = async () => {
@@ -194,7 +153,16 @@ export default function RegisterPage() {
     setError("")
 
     try {
-      const result = await sendFirebaseOTP(formData.phone)
+      const tempContainer = document.createElement("div")
+      tempContainer.id = "recaptcha-resend-container"
+      tempContainer.style.position = "fixed"
+      tempContainer.style.top = "-9999px"
+      tempContainer.style.left = "-9999px"
+      document.body.appendChild(tempContainer)
+
+      const result = await sendFirebaseOTP(formData.phone, "recaptcha-resend-container")
+
+      document.body.removeChild(tempContainer)
 
       if (result.success && result.confirmationResult) {
         setConfirmationResult(result.confirmationResult)
@@ -206,25 +174,19 @@ export default function RegisterPage() {
     } catch (error: any) {
       console.error("Firebase OTP resend failed:", error)
       setError(error.message || "Failed to resend OTP")
+
+      const tempContainer = document.getElementById("recaptcha-resend-container")
+      if (tempContainer) {
+        document.body.removeChild(tempContainer)
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  const handleRefreshRecaptcha = async () => {
-    setRecaptchaReady(false)
-    try {
-      await initializeRecaptchaV3()
-      setRecaptchaReady(true)
-      setError("")
-    } catch (error) {
-      console.error("❌ Failed to refresh reCAPTCHA:", error)
-      setError("Failed to refresh security verification")
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">
+      {/* Left Side - Hero Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -261,8 +223,10 @@ export default function RegisterPage() {
         </div>
       </div>
 
+      {/* Right Side - Registration Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
+          {/* Back to Home */}
           <Link
             href="/"
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-8 transition-colors"
@@ -273,6 +237,7 @@ export default function RegisterPage() {
 
           <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
             <CardHeader className="text-center pb-8">
+              {/* Logo */}
               <Link href="/" className="flex items-center justify-center space-x-3 mb-6">
                 <div className="relative w-12 h-8">
                   <Image
@@ -292,6 +257,7 @@ export default function RegisterPage() {
                 {step === "otp" && "Enter the code sent to your phone"}
               </CardDescription>
 
+              {/* Progress Indicator */}
               <div className="flex items-center justify-center space-x-2 mt-6">
                 <div className={`w-6 h-2 rounded-full ${step === "details" ? "bg-black" : "bg-gray-200"}`}></div>
                 <div className={`w-6 h-2 rounded-full ${step === "phone" ? "bg-black" : "bg-gray-200"}`}></div>
@@ -317,20 +283,20 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              {(error.includes("authorized domain") || error.includes("not properly configured")) && (
+              {/* Firebase Configuration Warning */}
+              {error.includes("authorized domain") && (
                 <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
                   <div className="flex items-start space-x-3">
                     <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
                     <div className="text-sm text-yellow-800">
-                      <p className="font-medium mb-2">Firebase Configuration Issue</p>
-                      <p className="mb-2">Authentication is not properly set up. This could be due to:</p>
-                      <ul className="list-disc list-inside space-y-1 text-xs">
-                        <li>Missing environment variables</li>
-                        <li>Domain not authorized in Firebase Console</li>
-                        <li>Phone authentication not enabled</li>
-                        <li>Firebase project configuration issues</li>
-                      </ul>
-                      <p className="mt-2 text-xs">Please contact support if this issue persists.</p>
+                      <p className="font-medium mb-2">Firebase Configuration Required</p>
+                      <p className="mb-2">To enable phone authentication, please:</p>
+                      <ol className="list-decimal list-inside space-y-1 text-xs">
+                        <li>Go to Firebase Console → Authentication → Settings</li>
+                        <li>Add your domain to "Authorized domains"</li>
+                        <li>Enable Phone authentication in Sign-in methods</li>
+                        <li>Configure your Firebase project settings</li>
+                      </ol>
                     </div>
                   </div>
                 </div>
@@ -338,6 +304,7 @@ export default function RegisterPage() {
 
               {step === "details" && (
                 <form onSubmit={handleDetailsSubmit} className="space-y-6">
+                  {/* Name Fields */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">
@@ -372,6 +339,7 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
+                  {/* Email Field */}
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                       Email Address
@@ -390,6 +358,7 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
+                  {/* Phone Field */}
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
                       Phone Number
@@ -409,6 +378,7 @@ export default function RegisterPage() {
                     <p className="text-xs text-gray-500">Enter your phone number with country code</p>
                   </div>
 
+                  {/* Terms and Conditions */}
                   <div className="flex items-start space-x-3">
                     <Checkbox
                       id="terms"
@@ -428,6 +398,7 @@ export default function RegisterPage() {
                     </Label>
                   </div>
 
+                  {/* Continue Button */}
                   <Button
                     type="submit"
                     className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
@@ -439,6 +410,7 @@ export default function RegisterPage() {
 
               {step === "phone" && (
                 <form onSubmit={handleSendOtp} className="space-y-6">
+                  {/* User Info Display */}
                   <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                     <p className="text-sm text-gray-600">Creating account for:</p>
                     <p className="font-medium text-gray-900">
@@ -448,41 +420,22 @@ export default function RegisterPage() {
                     <p className="text-sm text-gray-600">{formData.phone}</p>
                   </div>
 
+                  {/* Firebase reCAPTCHA Container */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">Security Protection</Label>
-                    <div className="flex items-center justify-center p-4 border border-gray-200 rounded-lg bg-gray-50">
-                      {recaptchaReady ? (
-                        <div className="flex items-center space-x-2 text-green-600 text-sm">
-                          <Shield className="h-4 w-4" />
-                          <span>Protected by reCAPTCHA v3</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-2 text-gray-500 text-sm">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-                          <span>Initializing protection...</span>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 text-center">
-                      This site is protected by reCAPTCHA and the Google{" "}
-                      <a href="https://policies.google.com/privacy" className="text-blue-600 hover:underline">
-                        Privacy Policy
-                      </a>{" "}
-                      and{" "}
-                      <a href="https://policies.google.com/terms" className="text-blue-600 hover:underline">
-                        Terms of Service
-                      </a>{" "}
-                      apply.
-                    </p>
-                    {/* Hidden container for Firebase reCAPTCHA */}
-                    <div id="recaptcha-container" className="hidden"></div>
+                    <Label className="text-sm font-medium text-gray-700">Security Verification</Label>
+                    <div
+                      id="recaptcha-container"
+                      className="flex justify-center min-h-[78px] items-center border border-gray-200 rounded-lg bg-gray-50"
+                    ></div>
+                    <p className="text-xs text-gray-500">Complete the security check to send OTP</p>
                   </div>
 
+                  {/* Action Buttons */}
                   <div className="space-y-4">
                     <Button
                       type="submit"
                       className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                      disabled={loading || !recaptchaReady}
+                      disabled={loading}
                     >
                       {loading ? (
                         <div className="flex items-center">
@@ -508,12 +461,14 @@ export default function RegisterPage() {
 
               {step === "otp" && (
                 <form onSubmit={handleVerifyOtp} className="space-y-6">
+                  {/* Phone Display */}
                   <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                     <p className="text-sm text-gray-600">Verification code sent to:</p>
                     <p className="font-medium text-gray-900">{formData.phone}</p>
                     <p className="text-xs text-green-600 mt-1">✅ Real SMS sent via Firebase</p>
                   </div>
 
+                  {/* OTP Field */}
                   <div className="space-y-2">
                     <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
                       Enter Verification Code
@@ -525,7 +480,7 @@ export default function RegisterPage() {
                         type="text"
                         required
                         value={formData.otp}
-                        onChange={(e) => setFormData({ ...formData, otp: e.target.value.replace(/\D/g, "") })}
+                        onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
                         className="pl-10 h-12 border-gray-200 focus:border-black focus:ring-black rounded-lg text-center text-lg tracking-widest"
                         placeholder="000000"
                         maxLength={6}
@@ -534,11 +489,12 @@ export default function RegisterPage() {
                     <p className="text-xs text-gray-500">Enter the 6-digit code from your SMS</p>
                   </div>
 
+                  {/* Action Buttons */}
                   <div className="space-y-4">
                     <Button
                       type="submit"
                       className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
-                      disabled={loading || formData.otp.length !== 6}
+                      disabled={loading}
                     >
                       {loading ? (
                         <div className="flex items-center">
@@ -573,6 +529,7 @@ export default function RegisterPage() {
                 </form>
               )}
 
+              {/* Sign In Link */}
               <div className="text-center pt-6 border-t border-gray-100">
                 <p className="text-sm text-gray-600">
                   Already have an account?{" "}
