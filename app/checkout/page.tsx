@@ -78,7 +78,6 @@ export default function CheckoutPage() {
     country: "India",
   })
 
-  // Check if cart is loaded and has items
   useEffect(() => {
     if (cartState !== undefined) {
       setCartLoaded(true)
@@ -179,7 +178,6 @@ export default function CheckoutPage() {
     }
   }, [isAuthenticated])
 
-  // Load Razorpay script
   const loadRazorpayScript = () => {
     if (window.Razorpay) {
       setRazorpayLoaded(true)
@@ -208,7 +206,7 @@ export default function CheckoutPage() {
     // Safely calculate totals with fallbacks
     const subtotal = cartState?.total || 0
     const shipping = 0 // Always free shipping
-    const tax = subtotal * 0.18 // 18% GST
+    const tax = 0 // Removed GST calculation
     const total = subtotal + shipping + tax
     return { subtotal, shipping, tax, total }
   }
@@ -300,7 +298,6 @@ export default function CheckoutPage() {
     })
   }
 
-  // Handle Pay Now button click with improved error handling
   const handlePayNow = async () => {
     setLoading(true)
     try {
@@ -519,7 +516,7 @@ export default function CheckoutPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
           {/* Checkout Form */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            {/* Shipping Information */}
+            {/* ... existing shipping information form ... */}
             <Card className="border shadow-sm bg-white">
               <CardHeader className="pb-4">
                 <div className="flex items-center space-x-3">
@@ -787,7 +784,6 @@ export default function CheckoutPage() {
 
                 <Separator />
 
-                {/* Totals */}
                 <div className="space-y-2 sm:space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
@@ -796,10 +792,6 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Shipping</span>
                     <span className="font-medium text-green-600">Free</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Tax (GST 18%)</span>
-                    <span className="font-medium">₹{tax.toFixed(2)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-base sm:text-lg font-bold">
