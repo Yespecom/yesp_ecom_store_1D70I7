@@ -1257,6 +1257,155 @@ export class ApiClient {
       throw error
     }
   }
+
+  async createOrderWithFallback(orderData: any, localOrderData: any) {
+    console.log("📦 Creating order with fallback mechanism...")
+    console.log("📤 Order data for API:", orderData)
+    console.log("💾 Local order data for fallback:", localOrderData)
+
+    try {
+      // First, try to create the order using the existing createOrderAfterPayment method
+      const response = await this.createOrderAfterPayment({
+        items: orderData.items,
+        shippingAddress: orderData.shippingAddress,
+        paymentMethod: orderData.paymentMethod === "razorpay" ? "online" : orderData.paymentMethod,
+        notes: orderData.notes,
+        couponCode: orderData.couponCode,
+        razorpayPaymentId: orderData.paymentId || orderData.razorpayPaymentId,
+        razorpayOrderId: orderData.razorpayOrderId,
+        razorpaySignature: orderData.paymentSignature || orderData.razorpaySignature,
+      })
+
+      console.log("✅ Order created successfully in database:", response)
+
+      // Update local storage with the successful database order
+      if (response.success && response.order) {
+        const updatedLocalOrder = {
+          ...localOrderData,
+          _id: response.order._id || response.order.id,
+          orderNumber: response.order.orderNumber || localOrderData.orderNumber,
+          status: "confirmed",
+          paymentStatus: "completed",
+          createdAt: response.order.createdAt || localOrderData.createdAt,
+        }
+        localStorage.setItem("lastOrder", JSON.stringify(updatedLocalOrder))
+        console.log("💾 Updated local storage with database order info")
+      }
+
+      return response
+    } catch (error: any) {
+      console.error("❌ Database order creation failed:", error)
+      console.log("💾 Falling back to local storage order")
+
+      // Save the order locally as fallback
+      const fallbackOrder = {
+        ...localOrderData,
+        status: "confirmed",
+        paymentStatus: localOrderData.paymentStatus || "completed",
+        isLocalOrder: true,
+        syncPending: true,
+        errorMessage: error.message,
+        createdAt: new Date().toISOString(),
+      }
+
+      localStorage.setItem("lastOrder", JSON.stringify(fallbackOrder))
+      localStorage.setItem("pendingOrders", JSON.stringify([fallbackOrder]))
+
+      console.log("💾 Order saved locally for later sync")
+
+      // Return success response for local order
+      return {
+        success: true,
+        order: fallbackOrder,
+        message: "Payment successful! Order saved locally and will be synced to database.",
+        isLocalOrder: true,
+      }
+    }
+  }
+
+  async retryPendingOrders() {
+    console.log("🔄 Checking for pending orders to sync...")
+
+    try {
+      const pendingOrdersStr = localStorage.getItem("pendingOrders")
+      if (!pendingOrdersStr) {
+        console.log("📝 No pending orders found")
+        return { success: true, syncedCount: 0 }
+      }
+
+      const pendingOrders = JSON.parse(pendingOrdersStr)
+      if (!Array.isArray(pendingOrders) || pendingOrders.length === 0) {
+        console.log("📝 No pending orders to sync")
+        return { success: true, syncedCount: 0 }
+      }
+
+      console.log(`🔄 Found ${pendingOrders.length} pending orders to sync`)
+      let syncedCount = 0
+      const stillPending = []
+
+      for (const localOrder of pendingOrders) {
+        try {
+          console.log(`🔄 Attempting to sync order: ${localOrder.orderNumber}`)
+
+          const orderData = {
+            items: localOrder.items.map((item: any) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+            })),
+            shippingAddress: {
+              name: localOrder.shippingAddress.name,
+              street: localOrder.shippingAddress.address,
+              city: localOrder.shippingAddress.city,
+              state: localOrder.shippingAddress.state,
+              zipCode: localOrder.shippingAddress.pincode,
+              country: localOrder.shippingAddress.country || "India",
+            },
+            paymentMethod: localOrder.paymentMethod === "online" ? "online" : "cod",
+            notes: localOrder.notes || `Synced order: ${localOrder.orderNumber}`,
+            razorpayPaymentId: localOrder.paymentId || localOrder.razorpayPaymentId,
+            razorpayOrderId: localOrder.razorpayOrderId,
+            razorpaySignature: localOrder.paymentSignature || localOrder.razorpaySignature,
+          }
+
+          const response = await this.createOrderAfterPayment(orderData)
+
+          if (response.success) {
+            console.log(`✅ Successfully synced order: ${localOrder.orderNumber}`)
+            syncedCount++
+          } else {
+            console.log(`❌ Failed to sync order: ${localOrder.orderNumber}`)
+            stillPending.push(localOrder)
+          }
+        } catch (error) {
+          console.error(`❌ Error syncing order ${localOrder.orderNumber}:`, error)
+          stillPending.push(localOrder)
+        }
+      }
+
+      // Update pending orders list
+      if (stillPending.length === 0) {
+        localStorage.removeItem("pendingOrders")
+        console.log("✅ All pending orders synced successfully")
+      } else {
+        localStorage.setItem("pendingOrders", JSON.stringify(stillPending))
+        console.log(`⚠️ ${stillPending.length} orders still pending sync`)
+      }
+
+      return {
+        success: true,
+        syncedCount,
+        remainingCount: stillPending.length,
+        message: `Synced ${syncedCount} orders. ${stillPending.length} still pending.`,
+      }
+    } catch (error: any) {
+      console.error("❌ Error during pending orders retry:", error)
+      return {
+        success: false,
+        error: error.message,
+        syncedCount: 0,
+      }
+    }
+  }
 }
 
 export const apiClient = new ApiClient()
