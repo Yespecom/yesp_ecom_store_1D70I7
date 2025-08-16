@@ -444,9 +444,14 @@ export class ApiClient {
     razorpayPaymentId?: string
     razorpayOrderId?: string
     razorpaySignature?: string
+    // PhonePe response data (only for online payments)
+    phonePeTransactionId?: string
+    phonePePaymentId?: string
+    phonePeStatus?: string
   }) {
-    console.log("📦 Step 4: Creating order after payment verification...")
-    // Set payment status based on payment method
+    console.log("📦 Creating order after payment verification...")
+    console.log("📤 Full order data being sent to API:", JSON.stringify(orderData, null, 2))
+
     const paymentStatus = orderData.paymentMethod === "online" ? "paid" : "pending"
 
     const apiOrderData = {
@@ -456,53 +461,82 @@ export class ApiClient {
       paymentStatus: paymentStatus,
       notes: orderData.notes || "",
       ...(orderData.couponCode && { couponCode: orderData.couponCode }),
-      // Include Razorpay data for online payments
+      // Include PhonePe data for online payments
+      ...(orderData.phonePeTransactionId && { phonePeTransactionId: orderData.phonePeTransactionId }),
+      ...(orderData.phonePePaymentId && { phonePePaymentId: orderData.phonePePaymentId }),
+      ...(orderData.phonePeStatus && { phonePeStatus: orderData.phonePeStatus }),
       ...(orderData.razorpayPaymentId && { razorpayPaymentId: orderData.razorpayPaymentId }),
       ...(orderData.razorpayOrderId && { razorpayOrderId: orderData.razorpayOrderId }),
       ...(orderData.razorpaySignature && { razorpaySignature: orderData.razorpaySignature }),
     }
 
     console.log("📤 Creating order with payment status:", paymentStatus)
+    console.log("📤 Final API payload:", JSON.stringify(apiOrderData, null, 2))
 
     try {
+      console.log("[v0] Making API request to:", `${BASE_URL}/orders`)
+      console.log("[v0] Request headers:", {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.token}`,
+      })
+      console.log("[v0] Request method: POST")
+      console.log("[v0] Request body:", JSON.stringify(apiOrderData, null, 2))
+
       const response = await this.request<any>("/orders", {
         method: "POST",
         body: JSON.stringify(apiOrderData),
       })
 
+      console.log("[v0] Raw API response:", response)
+      console.log("[v0] Response type:", typeof response)
+      console.log("[v0] Response keys:", response ? Object.keys(response) : "null")
+
       console.log("✅ Order created successfully after payment:", response)
 
-      // Handle various response structures
-      if (response.success && response.data) {
+      if (response && (response.success || response.order || response.data)) {
         return {
           success: true,
-          order: response.data,
+          order: response.order || response.data || response,
           message: response.message || "Order created successfully",
         }
-      }
-      if (response.order) {
-        return {
-          success: true,
-          order: response.order,
-          message: response.message || "Order created successfully",
-        }
-      }
-      if (response.message && response.orderNumber) {
-        return {
-          success: true,
-          order: response,
-          message: response.message,
-        }
-      }
-
-      // If we get here, assume success if no explicit error
-      return {
-        success: true,
-        order: response,
-        message: "Order created successfully",
+      } else {
+        console.error("❌ Invalid API response format:", response)
+        console.error("[v0] Expected response.success, response.order, or response.data but got:", {
+          success: response?.success,
+          order: response?.order,
+          data: response?.data,
+          fullResponse: response,
+        })
+        throw new Error(`Invalid API response: ${JSON.stringify(response)}`)
       }
     } catch (error: any) {
-      console.error("❌ Order creation failed after payment:", error)
+      console.error("❌ Failed to create order after payment:", error)
+
+      console.error("[v0] Detailed error information:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        cause: error.cause,
+      })
+
+      if (error.response) {
+        console.error("❌ API Error Response:", {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          headers: error.response.headers,
+        })
+        console.error("[v0] Full error response object:", error.response)
+      }
+
+      if (error.code === "NETWORK_ERROR" || error.message.includes("fetch")) {
+        console.error("[v0] This appears to be a network connectivity issue")
+      }
+
+      if (error.message.includes("CORS") || error.message.includes("cross-origin")) {
+        console.error("[v0] This appears to be a CORS (Cross-Origin Resource Sharing) issue")
+      }
+
       throw error
     }
   }
@@ -1190,60 +1224,6 @@ export class ApiClient {
     }
   }
 
-  async createOrderAfterPayment(orderData: {
-    items: Array<{
-      productId: string
-      quantity: number
-    }>
-    shippingAddress: {
-      name: string
-      street: string
-      city: string
-      state: string
-      zipCode: string
-      country?: string
-    }
-    paymentMethod: "online" | "cod"
-    notes?: string
-    couponCode?: string
-    // PhonePe response data (only for online payments)
-    phonePeTransactionId?: string
-    phonePePaymentId?: string
-    phonePeStatus?: string
-  }) {
-    console.log("📦 Creating order after PhonePe payment verification...")
-    const paymentStatus = orderData.paymentMethod === "online" ? "paid" : "pending"
-
-    const apiOrderData = {
-      items: orderData.items,
-      shippingAddress: orderData.shippingAddress,
-      paymentMethod: orderData.paymentMethod,
-      paymentStatus: paymentStatus,
-      notes: orderData.notes || "",
-      ...(orderData.couponCode && { couponCode: orderData.couponCode }),
-      // Include PhonePe data for online payments
-      ...(orderData.phonePeTransactionId && { phonePeTransactionId: orderData.phonePeTransactionId }),
-      ...(orderData.phonePePaymentId && { phonePePaymentId: orderData.phonePePaymentId }),
-      ...(orderData.phonePeStatus && { phonePeStatus: orderData.phonePeStatus }),
-    }
-
-    console.log("📤 Creating order with payment status:", paymentStatus)
-
-    try {
-      const response = await this.request<any>("/orders", {
-        method: "POST",
-        body: JSON.stringify(apiOrderData),
-      })
-
-      console.log("✅ Order created successfully after PhonePe payment:", response)
-      return response
-    } catch (error: any) {
-      console.error("❌ Failed to create order after PhonePe payment:", error)
-      throw error
-    }
-  }
-
-  // PhonePe Payment Verification API
   async verifyPhonePePayment(transactionId: string) {
     console.log("🔍 Verifying PhonePe payment:", transactionId)
     try {
@@ -1289,36 +1269,49 @@ export class ApiClient {
           createdAt: response.order.createdAt || localOrderData.createdAt,
         }
         localStorage.setItem("lastOrder", JSON.stringify(updatedLocalOrder))
-        console.log("💾 Updated local storage with database order info")
+        console.log("💾 Updated local order with database info")
+
+        return {
+          success: true,
+          order: response.order,
+          message: "Order created successfully in database",
+        }
       }
 
-      return response
+      // If response doesn't have expected structure, log it and use fallback
+      console.warn("⚠️ Unexpected API response structure:", response)
+      throw new Error("Invalid API response structure")
     } catch (error: any) {
-      console.error("❌ Database order creation failed:", error)
-      console.log("💾 Falling back to local storage order")
+      console.error("❌ Failed to create order in database:", error)
 
-      // Save the order locally as fallback
-      const fallbackOrder = {
+      console.error("❌ Error details:", {
+        message: error.message,
+        status: error.status,
+        response: error.response,
+        stack: error.stack,
+      })
+
+      // Save to pending orders for retry
+      const pendingOrders = JSON.parse(localStorage.getItem("pendingOrders") || "[]")
+      const pendingOrder = {
         ...localOrderData,
-        status: "confirmed",
-        paymentStatus: localOrderData.paymentStatus || "completed",
-        isLocalOrder: true,
-        syncPending: true,
-        errorMessage: error.message,
-        createdAt: new Date().toISOString(),
+        apiOrderData: orderData,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        retryCount: 0,
       }
+      pendingOrders.push(pendingOrder)
+      localStorage.setItem("pendingOrders", JSON.stringify(pendingOrders))
 
-      localStorage.setItem("lastOrder", JSON.stringify(fallbackOrder))
-      localStorage.setItem("pendingOrders", JSON.stringify([fallbackOrder]))
+      console.log("💾 Order saved to pending list for retry")
 
-      console.log("💾 Order saved locally for later sync")
-
-      // Return success response for local order
+      // Return success with local order (payment was successful)
       return {
         success: true,
-        order: fallbackOrder,
+        order: localOrderData,
         message: "Payment successful! Order saved locally and will be synced to database.",
         isLocalOrder: true,
+        error: error.message,
       }
     }
   }
